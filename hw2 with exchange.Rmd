@@ -1,0 +1,638 @@
+---
+title: "T.S HW2"
+author: "Sharon Liu"
+date: "2022-10-25"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# 資料描述
+
+
+此次選擇標準普爾SP500、台股加權指數TWII、倫敦金融時報100指數(FTSE)、美金台幣貨幣對、英鎊台幣貨幣對與美金英鎊貨幣對，於2012-10-12到2022-10-12這段時間內的股價日資料，分別繪製其報酬率與對數報酬率的time plot、ACF與PACF，並進行Ljung Box Test，看資料是否有序列相關，若有序列相關將更進一步建立AR模型與建模後續檢定。
+
+
+```{r lib,include=FALSE}
+library(zoo)
+library(xts)
+library(TTR)
+library(quantmod)
+library(ggplot2)
+library(magrittr)
+library(broom)
+library(qpcR)   
+library(fpp2)
+
+```
+
+
+```{r data,include=FALSE}
+
+getSymbols("^GSPC", from ='2012-10-12', to = '2022-10-12')
+SP500<-as.xts(data.frame(GSPC = GSPC[, "GSPC.Adjusted"]))
+names(SP500) = c("SP500")
+index(SP500) = as.Date(index(SP500))
+logrt.SP500<-apply( log(SP500) , 2 , diff )*100
+rt.SP500<-(exp(apply( log(SP500) , 2 , diff ))-1)*100
+
+getSymbols("^TWII", from = '2012-10-12', to = '2022-10-12')
+TWII<-as.xts(data.frame(TWII = TWII[, "TWII.Adjusted"]))
+TWII<-na.omit(TWII)
+names(TWII) = c("TWII")
+index(TWII) = as.Date(index(TWII))
+logrt.TWII<-apply( log(TWII) , 2 , diff )*100
+rt.TWII<-(exp(apply( log(TWII) , 2 , diff ))-1)*100
+
+getSymbols("^FTSE", from = '2012-10-12', to = '2022-10-12')
+FTSE<-as.xts(data.frame(FTSE = FTSE[, "FTSE.Adjusted"]))
+FTSE<-na.omit(FTSE)
+names(FTSE) = c("FTSE")
+index(FTSE) = as.Date(index(FTSE))
+logrt.FTSE<-apply( log(FTSE) , 2 , diff )*100
+rt.FTSE<-(exp(apply( log(FTSE) , 2 , diff ))-1)*100
+
+getSymbols("USDTWD=X", from = '2012-10-12', to = '2022-10-12')
+USDTWD<-as.xts(data.frame(`USDTWD=X` = `USDTWD=X`[, paste0("USDTWD=X.Adjusted")]))
+USDTWD<-na.omit(USDTWD)
+names(USDTWD) = c("USDTWD")
+index(USDTWD) = as.Date(index(USDTWD))
+USDTWD$USDTWD[578,]<-30.13
+logrt.USDTWD<-apply( log(USDTWD) , 2 , diff )*100
+rt.USDTWD<-(exp(apply( log(USDTWD) , 2 , diff ))-1)*100
+
+getSymbols("GBPTWD=X", from = '2012-10-12', to = '2022-10-12')
+GBPTWD<-as.xts(data.frame(`GBPTWD=X` = `GBPTWD=X`[, paste0("GBPTWD=X.Adjusted")]))
+GBPTWD<-na.omit(GBPTWD)
+names(GBPTWD) = c("GBPTWD")
+index(GBPTWD) = as.Date(index(GBPTWD))
+logrt.GBPTWD<-apply( log(GBPTWD) , 2 , diff )*100
+rt.GBPTWD<-(exp(apply( log(GBPTWD) , 2 , diff ))-1)*100
+
+getSymbols("USDGBP=X", from = '2012-10-12', to = '2022-10-12')
+USDGBP<-as.xts(data.frame(`USDGBP=X` = `USDGBP=X`[, paste0("USDGBP=X.Adjusted")]))
+USDGBP<-na.omit(USDGBP)
+names(USDGBP) = c("USDGBP")
+index(USDGBP) = as.Date(index(USDGBP))
+logrt.USDGBP<-apply( log(USDGBP) , 2 , diff )*100
+rt.USDGBP<-(exp(apply( log(USDGBP) , 2 , diff ))-1)*100
+
+
+
+
+res<-function(data,name){
+  
+  
+  acf(data, lag.max = log(length(data)), plot = TRUE,main = paste("ACF","of",name))
+  
+  pacf(data, plot = TRUE, main = paste("PACF","of",name))
+  
+  Box.test(data, lag=10, type='Ljung')
+}
+
+```
+
+
+
+# 1.1 Daily Return of SP500 
+
+
+## Time Plot
+
+```{r, echo=FALSE}
+rttp.SP500=tidy(as.xts(rt.SP500)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#E7B800") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(rt.SP500),"Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+rttp.SP500
+```
+
+從上圖可以看到SP500的日報酬在2020年初之前的波動度大約在-5~5之間，直到2020年1月才有劇烈的變化，恰逢2020年1月至4月期間為2020國際金融恐慌，其起因於2019冠狀病毒病疫情在全球蔓延，並加以其他因素共同影響，導致全球金融市場的大幅動盪。
+
+
+## ACF、PACF & Ljung Box Test
+
+
+
+```{r,echo=FALSE}
+res(rt.SP500,"SP500 simple return")
+
+```
+從上圖SP500日報酬的ACF可以看到資料雖然有幾個lag是顯著的，但在第三期便cut off，也沒有看到指數遞減的現象，故初步認為SP500的日報酬並不存在自我相關性，但若更進一步做Ljung Box test其p-value < 0.05，意味著資料之間仍存在序列相關性，有鑑於此，我們仍會以此結果作為依據建立AR Model並進行後續模型診斷。
+
+
+# 1.2 Daily Return of TWII 
+
+
+
+## Time Plot
+
+
+```{r,echo=FALSE}
+rttp.TWII=tidy(as.xts(rt.TWII)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#2E9FDF") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(rt.TWII),"Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+rttp.TWII
+```
+
+從上圖可以看到台股在2015年8月中國股災、2018年10月中美貿易戰、2020國際金融恐慌與2021年5月台灣三級警戒的時後，TWII的日報酬的波動相較於SP500明顯，也較不平穩，但其變動範圍仍較SP500小一些。
+
+## ACF、PACF & Ljung Box Test
+
+
+```{r,echo=FALSE}
+
+res(rt.TWII,"TWII simple return")
+
+```
+從上圖TWII日報酬的ACF中沒有看到指數遞減的現象，第一期便cut off，且沒有任何一個lag是顯著的，由此來看資料並不存在自我相關性，此外，Ljung Box test其p-value=0.2704 > 0.05，意味著資料之間不存在序列相關性，故台股指數不會做後續AR的建模。
+
+
+
+# 1.3 Daily Return of FTSE 
+
+
+## Time Plot
+
+```{r,echo=FALSE}
+rttp.FTSE=tidy(as.xts(rt.FTSE)) %>%
+      ggplot(aes(x=index,y=value)) + geom_line(color="#FC4E07") +geom_hline(yintercept = 0,color='black')+
+      labs(title = paste(colnames(rt.FTSE),"Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+      xlab("Date") + ylab("Daily Return in Percentage") 
+rttp.FTSE
+```
+
+從上圖可以看到FTSE的日報酬在2020年初之前的波動度大約在-3~3之間，直到2020年1月才有劇烈的變化，恰逢2020年1月至4月期間為2020國際金融恐慌，FTSE的變化整體來說與SP500相仿。
+
+## ACF、PACF & Ljung Box Test
+
+```{r,echo=FALSE}
+
+res(rt.FTSE,"FTSE simple return")
+```
+
+從上圖FTSE日報酬的ACF可以看到autocorrelation幾乎都是不顯著的，也沒有看到指數遞減的現象，故初步認為FTSE的日報酬並不存在自我相關性，但若更進一步做Ljung Box test其p-value < 0.05，意味著資料之間仍存在序列相關性，有鑑於此，我們仍會以此結果作為依據建立AR Model並進行後續模型診斷。
+
+
+
+# 1.4 Daily Return of USD/TWD
+
+
+## Time Plot
+
+```{r,echo=FALSE}
+rttp.USDTWD=tidy(as.xts(rt.USDTWD)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#E7B800") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(rt.USDTWD),"Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+rttp.USDTWD
+```
+
+從上圖可以看到2013年初到2016年中USD/TWD的日報酬震盪較為劇烈，期間內查到的有2015新興市場金融風暴，而在2018年波動後趨緩，波動度大約在-2~2之間。
+
+
+## ACF、PACF & Ljung Box Test
+
+```{r,echo=FALSE}
+res(rt.USDTWD,"USDTWD simple return")
+```
+
+
+從上圖USDTWD貨幣對日報酬的ACF可以看到autocorrelation除了lag1以外皆不顯著，更進一步做Ljung Box test其p-value < 0.05，意味著資料之間仍存在序列相關性，因此，我們仍會以此結果作為依據建立AR Model並進行後續模型診斷。
+
+# 1.5 Daily Return of GBP/TWD 
+
+
+## Time Plot
+
+```{r,echo=FALSE}
+rttp.GBPTWD=tidy(as.xts(rt.GBPTWD)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#2E9FDF") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(rt.GBPTWD),"Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+rttp.GBPTWD
+```
+
+
+從上圖可以看到英鎊台幣貨幣對的日報酬的波動度大約在-3~3之間，其中有一筆日資料下探到-6%為
+2016年10月7號英鎊閃崩。
+
+
+
+## ACF、PACF & Ljung Box Test
+
+```{r,echo=FALSE}
+res(rt.GBPTWD,"GBPTWD simple return")
+```
+
+
+從上圖GBPTWD貨幣對日報酬的ACF可以看到autocorrelation除了lag1以外皆不顯著，更進一步做Ljung Box test其p-value < 0.05，意味著資料之間仍存在序列相關性，因此，我們仍會以此結果作為依據建立AR Model並進行後續模型診斷
+
+# 1.6 Daily Return of USD/GBP 
+
+
+## Time Plot
+
+```{r,echo=FALSE}
+rttp.USDGBP=tidy(as.xts(rt.USDGBP)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#FC4E07") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(rt.USDGBP),"Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+rttp.USDGBP
+```
+
+
+從上圖可以看到除了2016年10月英鎊美元貨幣對閃崩、2020年初、2022年尾有短暫的震盪，英鎊美元貨幣對的日報酬的波動度皆平穩大約在-2~2之間。
+
+## ACF、PACF & Ljung Box Test
+
+```{r,echo=FALSE}
+res(rt.USDGBP,"USDGBP simple return")
+```
+
+
+從上圖美金英鎊貨幣對的日報酬的ACF中沒有看到指數遞減的現象，pacf圖中的lag也多為不顯著 ，由此判斷資料並不存在自我相關性，此外，Ljung Box test其p-value=0.0923 > 0.05，意味著資料之間不存在序列相關性，故美金英鎊貨幣對不會做後續AR的建模。
+
+
+# 2.1 Daily Log Return of SP500 
+
+## Time Plot
+
+```{r,echo=FALSE}
+logrttp.SP500=tidy(as.xts(logrt.SP500)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#E7B800") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(logrt.SP500),"Log Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+logrttp.SP500
+```
+
+
+上圖為SP500對數日報酬，其與SP500的日報酬同樣在2020年1-4月有較大的波動，但在其他時間波動度大約在-5~5之間，與SP500日報酬的變化相仿。
+
+## ACF、PAC & Ljung Box Test
+
+```{r,echo=FALSE}
+res(logrt.SP500,"SP500 log return")
+
+```
+
+
+上圖為SP500對數日報酬的ACF可以看到資料雖然有幾個lag是顯著的，但仍沒有看到指數遞減的現象，故初步認為SP500的日報酬並不存在自我相關性，但若更進一步做Ljung Box test其p-value < 0.05，意味著資料之間仍存在序列相關性，有鑑於此，我們仍會以此結果作為依據建立AR Model並進行後續模型診斷。
+
+
+# 2.2 Daily Log Return of TWII 
+
+## Time Plot
+
+```{r,echo=FALSE}
+logrttp.TWII=tidy(as.xts(logrt.TWII)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#2E9FDF") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(logrt.TWII),"Log Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+logrttp.TWII
+```
+
+
+從上圖可以看到台股在2015年8月中國股災、2018年10月中美貿易戰、2020國際金融恐慌與2021年5月台灣三級警戒的時後，TWII的對數日報酬波動相較於SP500明顯，也較不平穩，與TWII 的日報酬有同樣的變化。
+
+
+
+## ACF、PAC & Ljung Box Test
+
+```{r,echo=FALSE}
+
+res(logrt.TWII,"TWII log return")
+
+```
+
+
+從上圖TWII對數日報酬的ACF中沒有看到指數遞減的現象，第一期便cut off，且沒有任何一個lag是顯著的，由此來看資料並不存在自我相關性，此外，Ljung Box test其p-value=0.2534 > 0.05，意味著資料之間不存在序列相關性，故台股指數不會做後續AR的建模。
+
+
+# 2.3 Daily Log Return of FTSE
+
+## Time Plot
+```{r,echo=FALSE}
+logrttp.FTSE=tidy(as.xts(logrt.FTSE)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#FC4E07") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(logrt.FTSE),"Log Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+logrttp.FTSE
+```
+
+
+從上圖可以看到FTSE的對數日報酬在2020年初之前的波動度大約在-3~3之間，直到2020年1月才有劇烈的變化，恰逢2020年1月至4月期間為2020國際金融恐慌，FTSE的變化整體來說與SP500相仿，其對數日報酬的變化也與日報酬的變化相仿。
+
+## ACF、PACF & Ljung Box Test
+
+
+```{r, echo=FALSE}
+
+res(logrt.FTSE,"FTSE log return")
+```
+
+從上圖FTSE對數日報酬的ACF可以看到autocorrelation幾乎都是不顯著的，也沒有看到指數遞減的現象，故初步認為FTSE的日報酬並不存在自我相關性，但若更進一步做Ljung Box test其p-value < 0.05，意味著資料之間仍存在序列相關性，有鑑於此，我們仍會以此結果作為依據建立AR Model並進行後續模型診斷。
+
+
+# 2.4 Daily Log Return of USDTWD
+
+
+## Time Plot
+
+```{r}
+logrttp.USDTWD=tidy(as.xts(logrt.USDTWD)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#E7B800") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(logrt.USDTWD),"Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+logrttp.USDTWD
+```
+
+從上圖可以看到2013年初到2016年中USD/TWD的日報酬震盪較為劇烈，期間內查到的有2015新興市場金融風暴，而在2018年波動後趨緩，波動度大約在-2~2之間，其對數日報酬的變化也與日報酬的變化相仿。
+
+## ACF、PAC & Ljung Box Test
+```{r,echo=FALSE}
+res(logrt.USDTWD,"USDTWD log return")
+```
+
+從上圖USDTWD貨幣對日報酬的ACF可以看到autocorrelation除了lag1以外皆不顯著，更進一步做Ljung Box test其p-value < 0.05，意味著資料之間仍存在序列相關性，因此，我們仍會以此結果作為依據建立AR Model並進行後續模型診斷。
+
+# 2.5 Daily Log Return of GBPTWD 
+
+
+## Time Plot
+
+```{r,echo=FALSE}
+logrttp.GBPTWD=tidy(as.xts(logrt.GBPTWD)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#2E9FDF") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(logrt.GBPTWD),"Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+logrttp.GBPTWD
+```
+
+從上圖可以看到英鎊台幣貨幣對的日報酬的波動度大約在-3~3之間，其中有一筆日資料下探到-6%為
+2016年10月7號英鎊閃崩，其對數日報酬的變化也與日報酬的變化相仿。
+
+## ACF、PAC & Ljung Box Test
+
+```{r,echo=FALSE}
+res(logrt.GBPTWD,"GBPTWD log return")
+```
+
+從上圖GBPTWD貨幣對日報酬的ACF可以看到autocorrelation除了lag1以外皆不顯著，更進一步做Ljung Box test其p-value < 0.05，意味著資料之間仍存在序列相關性，因此，我們仍會以此結果作為依據建立AR Model並進行後續模型診斷
+
+
+
+# 2.6 Daily Log Return of USDGBP 
+
+
+## Time Plot
+
+```{r,echo=FALSE}
+logrttp.USDGBP=tidy(as.xts(logrt.USDGBP)) %>%
+  ggplot(aes(x=index,y=value)) + geom_line(color="#FC4E07") +geom_hline(yintercept = 0,color='black')+
+  labs(title = paste(colnames(logrt.USDGBP),"Daily Return for 10 years"),subtitle = "Daily Return",caption = " Time Plot") +
+  xlab("Date") + ylab("Daily Return in Percentage") 
+logrttp.USDGBP
+```
+
+從上圖可以看到除了2016年10月英鎊美元貨幣對閃崩、2020年初、2022年尾有短暫的震盪，英鎊美元貨幣對的日報酬的波動度皆平穩大約在-2~2之間，其對數日報酬的變化也與日報酬的變化相仿。
+
+
+
+## ACF、PAC & Ljung Box Test
+
+```{r,echo=FALSE}
+res(logrt.USDGBP,"USDGBP log return")
+```
+
+從上圖美金英鎊貨幣對的日報酬的ACF中沒有看到指數遞減的現象，pacf圖中的lag也多為不顯著 ，由此判斷資料並不存在自我相關性，此外，Ljung Box test其p-value=0.08502 > 0.05，意味著資料之間不存在序列相關性，故美金英鎊貨幣對不會做後續AR的建模。
+
+# Conclusion of Simple Return and Log Return for three stock index and it's currency pair.
+
+比較三種指數的Time plot可以看到倫敦100(FTSE)與美國標普500(SP500)的趨勢較為相仿，雖然兩者在ACF皆看不出自我相關性，但若更進一步做Ljung Box test皆為顯數，存在序列相關，故我們仍會以檢定結果作為依據建立AR model。
+大盤指數的acf圖多為cutoff，pacf顯著的lag錯落於前幾根，而貨幣對的acf圖多為只有lag1顯著，pacf前幾個lag顯著。
+其中台指與美元英鎊貨幣對不論是ACF或Ljung Box Test的結果皆不顯著，故我們後續不會做TWII的AR Model.
+
+# 3 AR Model and Model Diagnostic
+
+```{r, echo=FALSE}
+modle.MLE<-function(data){
+  
+  m1 = ar(data, method="mle")
+  m1$aic
+  m1$order
+  
+  m2 = arima(data, order=c(m1$order,0,0))
+  m2
+  
+  phi0_hat = (1-sum(m2$coef[1:m1$order]))*m2$coef[m1$order+1]
+  phi0_hat
+  
+  sqrt(m2$sigma2)
+  
+  bt<-Box.test(m2$residuals, lag=10, type='Ljung')
+
+  
+  tsdiag(m2, gof=floor(log(length(data)))+1,main='ts diag') 
+  
+  p1    = c(1,-m2$coef[1:m1$order])
+  roots = polyroot(p1) 
+  roots          
+  modulus = Mod(roots)
+  modulus
+  
+  k = 2*pi/acos(Re(roots[1])/modulus[1])
+  k
+  res<-list()
+  objs<-c("AIC","mle.order","m1","m2","Residual Box Test","phi0_hat","sigma2","roots","modulus","business cycle")
+  res.num<-list(m1$aic,m1$order,m1,m2,bt,phi0_hat,sqrt(m2$sigma2),roots ,modulus,k )
+  for (i in 1:length(res.num)){res[objs[i]] <- res.num[i]}
+  return(res)
+}
+
+
+```
+
+## 3.1 SP500
+
+### Simple Return
+```{r, echo=FALSE}
+modle.MLE(as.numeric(rt.SP500))
+```
+由於SP500日報酬的ACF沒有指數遞減的現象，也無法從圖中判斷AR模型的order p，故我們用AIC來選擇order p，並根據其選出的order p建立AR模型，再做後續的殘差檢定。
+從上面AIC、mle.order、m1的結果可以看到，若用AIC挑選模型，當p=10的時候AIC最小，故SP500日報酬以AR(10)建模。
+從m2的結果可以看到，其coefficient在lag3、lag5與lag10的時候並不顯著，其餘皆為顯著的。
+
+殘差的部分不論從ACF來看或是做Ljung Box Test結果皆不顯著，表示殘差已無自相關，已符合模型對white noise的假設，完成AR(10)的建模。
+
+另外，在弱平穩的的AR模型中，$E(r_t)=0\quad iff \quad \phi_0=0$，從上述結果可以看到$\hat{\phi_0}=0.04693446$與m2中intercept $E(r_t)=0.427$的值相近。
+
+從roots的結果可以看到特徵根皆為複數，表示ACF存在週期性，modulus的結果可以看到，所有的值皆>1，表示特徵方程的根皆落在單位圓外，AR(10)模型為弱平穩，最後的business cycle為7.86696，表示資料在這business cycle內會出現經濟擴張與經濟緊縮交替更迭的現象，而此現象平均而言約8週完成一次循環，過了八週以後會進入下個經濟景氣循環。
+
+
+### Log Return
+```{r, echo=FALSE}
+
+modle.MLE(as.numeric(logrt.SP500))
+
+```
+
+與SP500日報酬的作法相仿，由於SP500對數日報酬的ACF沒有指數遞減的現象，也無法從圖中判斷AR模型的order p，故我們用AIC來選擇order p，並根據其選出的order p建立AR模型，再做後續的殘差檢定
+。
+從上面結果可以看到AIC、mle.order、m1的結果與SP500日報酬的結果相仿，故我們仍以AR(10)對SP500的對數日報酬建模。
+
+從m2的結果可以看到，其coefficient在lag3、lag5與lag10的時候並不顯著，其餘皆為顯著的。
+
+殘差的部分不論從ACF來看或是做Ljung Box Test結果皆不顯著，表示殘差已無自相關，已符合模型對white noise的假設，完成AR(10)的建模。
+
+另外，在弱平穩的的AR模型中，$E(r_t)=0\quad iff \quad \phi_0=0$，從上述結果可以看到$\hat{\phi_0}=0.03928361$與m2中intercept $E(r_t)=0.367$的值相近。
+
+從roots的結果可以看到特徵根皆為複數，表示ACF存在週期性，modulus的結果可以看到，所有的值皆>1，表示特徵方程的根皆落在單位圓外，AR(10)模型為弱平穩，最後的business cycle為7.87694，表示資料在這business cycle內會出現經濟擴張與經濟緊縮交替更迭的現象，而此現象平均而言約8週完成一次循環，過了八週以後會進入下個經濟景氣循環。
+
+整體來說SP500的日報酬與對數日報酬的結果相仿，只是對數日報酬的值都會再小一些。
+
+
+
+## 3.2 FTSE
+
+### Simple Return
+```{r, echo=FALSE}
+modle.MLE(as.numeric(rt.FTSE))
+
+```
+
+與SP500的狀況雷同，有鑑於FTSE日報酬的ACF沒有指數遞減的現象，也無法從圖中判斷AR模型的order p，故我們用AIC來選擇order p，並根據其選出的order p建立AR模型，再做後續的殘差檢定。
+
+從上面AIC、mle.order、m1的結果可以看到，若用AIC挑選模型，當p=8的時候AIC最小，故FTSE日報酬以AR(8)建模。
+
+從m2的結果可以看到，其coefficient在lag1~lag5皆不顯著，直到lag6以後才較為顯著。
+
+殘差的部分不論從ACF來看或是做Ljung Box Test結果皆不顯著，表示殘差已無自相關，已符合模型對white noise的假設，完成AR(8)的建模。
+
+另外，在弱平穩的的AR模型中，$E(r_t)=0\quad iff \quad \phi_0=0$，從上述結果可以看到$\hat{\phi_0}=0.01257534$與m2中intercept $E(r_t)=0.0118$的值相近。
+
+從roots的結果可以看到特徵根皆為複數，表示ACF存在週期性，modulus的結果可以看到，所有的值皆>1，表示特徵方程的根皆落在單位圓外，AR(8)模型為弱平穩，最後的business cycle為5.830477，表示資料在這business cycle內會出現經濟擴張與經濟緊縮交替更迭的現象，而此現象平均而言約6週完成一次循環，過了6週以後會進入下個經濟景氣循環。
+
+
+### Log Return
+```{r, echo=FALSE}
+modle.MLE(as.numeric(logrt.FTSE))
+```
+
+與FTSE日報酬的作法相仿，FTSE的對數日報酬我們仍用AIC來選擇order p，並根據其選出的order p建立AR模型，再做後續的殘差檢定。
+
+從上面AIC、mle.order、m1的結果可以看到，若用AIC挑選模型，當p=8的時候AIC最小，故FTSE對數日報酬以AR(8)建模。
+
+從m2的結果可以看到，其coefficient在lag1~lag5皆不顯著，直到lag6以後才較為顯著。
+
+殘差的部分不論從ACF來看或是做Ljung Box Test結果皆不顯著，表示殘差已無自相關，已符合模型對white noise的假設，完成AR(8)的建模。
+
+另外，在弱平穩的的AR模型中，$E(r_t)=0\quad iff \quad \phi_0=0$，從上述結果可以看到$\hat{\phi_0}=0.007184453$與m2中intercept $E(r_t)=0.0068$的值相近。
+
+從roots的結果可以看到特徵根皆為複數，表示ACF存在週期性，modulus的結果可以看到，所有的值皆>1，表示特徵方程的根皆落在單位圓外，AR(8)模型為弱平穩，最後的business cycle為5.837107，表示資料在這business cycle內會出現經濟擴張與經濟緊縮交替更迭的現象，而此現象平均而言約6週完成一次循環，過了6週以後會進入下個經濟景氣循環。
+
+
+
+## 3.3 USD/TWD
+
+### Simple Return
+```{r, echo=FALSE}
+modle.MLE(as.numeric(rt.USDTWD))
+m1 = ar(as.numeric(rt.USDTWD),method = "mle")
+m1$order
+m2 = arima(as.numeric(rt.USDTWD),order = c(m1$order,0,0))
+plot(m2$residuals[-length(m2$residuals)], m2$residuals[-1], xlab = expression(paste(epsilon[i])), ylab = expression(paste(epsilon[i+1])))
+
+plot(m2$residuals,as.numeric(rt.USDTWD),xlab="residuals", ylab = "USD/TWD daily return")
+```
+
+從上面AIC、mle.order、m1的結果可以看到，若用AIC挑選模型，當p=11的時候AIC最小，故USD/TWD日報酬以AR(11)建模。
+
+從m2的結果可以看到，其coefficient在lag6、lag7、lag9、lag11時皆不顯著，其餘皆為顯著的。
+
+殘差的部分不論從ACF來看或是做Ljung Box Test結果皆不顯著，表示殘差已無自相關，但觀察 $\epsilon_{i+1}$ - $\epsilon_{i}$ plot 跟資料點與殘差圖可以發現，不僅殘差間有明顯疏密程度差異，殘差與資料間也有正相關的趨勢。
+
+另外，在弱平穩的的AR模型中，$E(r_t)=0\quad iff \quad \phi_0=0$，從上述結果可以看到$\hat{\phi_0}=0.0179 $與m2中intercept $E(r_t)=0.0070$的值相近。
+
+從roots的結果可以看到特徵根皆為複數，表示ACF存在週期性，modulus的結果可以看到，所有的值皆>1，表示特徵方程的根皆落在單位圓外，AR(8)模型為弱平穩，最後的business cycle為5.142442，表示資料在這business cycle內會出現經濟擴張與經濟緊縮交替更迭的現象，而此現象平均而言約5週完成一次循環，過了5週以後會進入下個經濟景氣循環。
+
+### Log Return
+```{r, echo=FALSE}
+modle.MLE(as.numeric(logrt.USDTWD))
+m1 = ar(as.numeric(logrt.USDTWD),method = "mle")
+m1$order
+m2 = arima(as.numeric(logrt.USDTWD),order = c(m1$order,0,0))
+plot(m2$residuals[-length(m2$residuals)], m2$residuals[-1], xlab = expression(paste(epsilon[i])), ylab = expression(paste(epsilon[i+1])))
+
+plot(m2$residuals,as.numeric(logrt.USDTWD),xlab="residuals", ylab = "USD/TWD log return")
+```
+
+從上面AIC、mle.order、m1的結果可以看到，若用AIC挑選模型，當p=11的時候AIC最小，故USD/TWD日報酬以AR(11)建模。
+
+從m2的結果可以看到，其coefficient在lag6、lag7、lag9、lag11時皆不顯著，其餘皆為顯著的。
+
+殘差的部分不論從ACF來看或是做Ljung Box Test結果皆不顯著，表示殘差已無自相關，同樣的觀察 $\epsilon_{i+1}$ - $\epsilon_{i}$ plot 跟資料點與殘差圖可以發現，不僅殘差間有明顯疏密程度差異，殘差與資料間也有正相關的趨勢。
+
+另外，在弱平穩的的AR模型中，$E(r_t)=0\quad iff \quad \phi_0=0$，從上述結果可以看到$\hat{\phi_0}=0.0179 $與m2中intercept $E(r_t)=0.0070$的值相近。
+
+從roots的結果可以看到特徵根皆為複數，表示ACF存在週期性，modulus的結果可以看到，所有的值皆>1，表示特徵方程的根皆落在單位圓外，AR(8)模型為弱平穩，最後的business cycle為5.142442，表示資料在這business cycle內會出現經濟擴張與經濟緊縮交替更迭的現象，而此現象平均而言約5週完成一次循環，過了5週以後會進入下個經濟景氣循環。
+
+## 3.4 GBP/TWD
+
+
+### Simple Return
+```{r,echo=FALSE}
+modle.MLE(as.numeric(rt.GBPTWD))
+m1 = ar(as.numeric(rt.GBPTWD),method = "mle")
+m1$order
+m2 = arima(as.numeric(rt.GBPTWD),order = c(m1$order,0,0))
+plot(m2$residuals[-length(m2$residuals)], m2$residuals[-1], xlab = expression(paste(epsilon[i])), ylab = expression(paste(epsilon[i+1])))
+
+plot(m2$residuals,as.numeric(rt.GBPTWD),xlab="residuals", ylab = "GBP/TWD daily return")
+```
+
+從上面AIC、mle.order、m1的結果可以看到，若用AIC挑選模型，當p=11的時候AIC最小，故USD/TWD日報酬以AR(11)建模。
+
+從m2的結果可以看到，其coefficient在lag5、lag6、lag10時皆不顯著，其餘皆為顯著的。
+
+殘差的部分不論從ACF來看或是做Ljung Box Test結果皆不顯著，表示殘差已無自相關，同美金台幣貨幣對 $\epsilon_{i+1}$ - $\epsilon_{i}$ plot 跟資料點與殘差圖可以發現，不僅殘差間有明顯疏密程度差異，殘差與資料間也有正相關的趨勢。
+
+另外，在弱平穩的的AR模型中，$E(r_t)=0\quad iff \quad \phi_0=0$，從上述結果可以看到$\hat{\phi_0}=--0.01055 $與m2中intercept $E(r_t)=-0.0055$的值相近。
+
+從roots的結果可以看到特徵根皆為複數，表示ACF存在週期性，modulus的結果可以看到，所有的值皆>1，表示特徵方程的根皆落在單位圓外，AR(11)模型為弱平穩，最後的business cycle為6.271309，表示資料在這business cycle內會出現經濟擴張與經濟緊縮交替更迭的現象，而此現象平均而言過6週完成一次循環，過了6週以後會進入下個經濟景氣循環。
+
+
+
+### Log Return
+```{r,echo=FALSE}
+modle.MLE(as.numeric(logrt.GBPTWD))
+m1 = ar(as.numeric(logrt.GBPTWD),method = "mle")
+m1$order
+m2 = arima(as.numeric(logrt.GBPTWD),order = c(m1$order,0,0))
+plot(m2$residuals[-length(m2$residuals)], m2$residuals[-1], xlab = expression(paste(epsilon[i])), ylab = expression(paste(epsilon[i+1])))
+
+plot(m2$residuals,as.numeric(logrt.GBPTWD),xlab="residuals", ylab = "GBP/TWD return")
+```
+
+從上面AIC、mle.order、m1的結果可以看到，若用AIC挑選模型，當p=11的時候AIC最小，故USD/TWD日報酬以AR(11)建模。
+
+從m2的結果可以看到，其coefficient在lag5、lag6、lag10時皆不顯著，其餘皆為顯著的。
+
+殘差的部分不論從ACF來看或是做Ljung Box Test結果皆不顯著，表示殘差已無自相關，透過$\epsilon_{i+1}$ - $\epsilon_{i}$ plot 跟資料點與殘差圖可以發現，不僅殘差間有明顯疏密程度差異，殘差與資料間也有正相關的趨勢。。
+
+另外，在弱平穩的的AR模型中，$E(r_t)=0\quad iff \quad \phi_0=0$，從上述結果可以看到$\hat{\phi_0}=--0.0204 $與m2中intercept $E(r_t)=-0.0108$的值相近。
+
+從roots的結果可以看到特徵根皆為複數，表示ACF存在週期性，modulus的結果可以看到，所有的值皆>1，表示特徵方程的根皆落在單位圓外，AR(11)模型為弱平穩，最後的business cycle為6.307128，表示資料在這business cycle內會出現經濟擴張與經濟緊縮交替更迭的現象，而此現象平均而言過6週完成一次循環，過了6週以後會進入下個經濟景氣循環。
+
+
+比較FTSE的日報酬與對數日報酬其結果相仿，只是對數日報酬的值都會再小一些。
+
+整體來說FTSE fit AR model後的coefficient大多不顯著，並沒有SP500的好，且從一開始SP500與FTSE的ACF便沒有指數遞減的現象，而所選的貨幣對其殘差皆有所規則含有未能解釋的資訊，或許這四比資料並不適用AR模型，故未來或許需考量用其他模型fit這兩筆資料。
