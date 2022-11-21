@@ -1,0 +1,13 @@
+# Check aic and it's order given max.p & max.q
+detect <- function(data,p,q){
+  temp <- c()
+  ord <- c()
+  for (i in 0:p) {
+    for (j in 0:q) {
+      if (i == 0 & j==0) next
+      temp <- c(temp,arima(data,order = c(i,0,j))$aic)
+      ord <- rbind(ord, c(i,0,j))
+    }
+  }
+  list(sort(temp),ord[order(temp), ])
+}
