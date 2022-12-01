@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 3. 分別對每一筆資料建立一適合的時間序列模型
 Step 1: Plot a time series format
 Step 2: Difference to make stationary on mean by removing the trend
-Step 3: Make stationary by applying log transform.
+Step 3: Make stationary by applying log transform ?
 Step 4: Difference log transform to make as stationary on both statistic mean and variance
 Step 5: Plot ACF & PACF, and identify the potential AR and MA model
 Step 6: Discovery of best fit ARIMA model
@@ -30,7 +30,7 @@ Step 8: Plot ACF & PACF for residuals of the model, and ensure no more informati
 library(zoo)
 library(xts)
 library(TTR)
-library(quantmod)
+library(quantmod)# Finance data
 library(ggplot2)
 library(magrittr)
 library(broom)
@@ -42,7 +42,7 @@ library(stats)
 
 
 
-```{r warning=FALSE}
+```{r ,include=FALSE}
 getSymbols("^GSPC", from ='2012-10-12', to = '2022-10-12')
 GSPC <- as.xts(data.frame(GSPC = GSPC[, "GSPC.Adjusted"]))
 names(GSPC) = c("GSPC")
@@ -50,46 +50,25 @@ index(GSPC) = as.Date(index(GSPC))
 logrt.GSPC <- apply( log(GSPC) , 2 , diff )*100
 rt.GSPC <- (exp(apply( log(GSPC) , 2 , diff ))-1)*100
 
-getSymbols("^TWII", from = '2012-10-12', to = '2022-10-12')
-TWII <- as.xts(data.frame(TWII = TWII[, "TWII.Adjusted"]))
-TWII <- na.omit(TWII)
-names(TWII) = c("TWII")
-index(TWII) = as.Date(index(TWII))
-logrt.TWII <- apply( log(TWII) , 2 , diff )*100
-rt.TWII <- (exp(apply( log(TWII) , 2 , diff ))-1)*100
+getSymbols("^N225", from ='2012-10-12', to = '2022-10-12')
+N225 <- as.xts(data.frame(N225 = N225[, "N225.Adjusted"]))
+N225 <- na.omit(N225)
+names(N225) = c("N225")
+index(N225) = as.Date(index(N225))
+logrt.N225 <- apply( log(N225) , 2 , diff )*100
+rt.N225 <- (exp(apply( log(N225) , 2 , diff ))-1)*100
 
-getSymbols("^FTSE", from = '2012-10-12', to = '2022-10-12')
-FTSE<-as.xts(data.frame(FTSE = FTSE[, "FTSE.Adjusted"]))
-FTSE<-na.omit(FTSE)
-names(FTSE) = c("FTSE")
-index(FTSE) = as.Date(index(FTSE))
-logrt.FTSE<-apply( log(FTSE) , 2 , diff )*100
-rt.FTSE<-(exp(apply( log(FTSE) , 2 , diff ))-1)*100
-
-getSymbols("USDTWD=X", from = '2012-10-12', to = '2022-10-12')
-USDTWD<-as.xts(data.frame(`USDTWD=X` = `USDTWD=X`[, paste0("USDTWD=X.Adjusted")]))
-USDTWD<-na.omit(USDTWD)
-names(USDTWD) = c("USDTWD")
-index(USDTWD) = as.Date(index(USDTWD))
-USDTWD$USDTWD[578,]<-30.13
-logrt.USDTWD<-apply( log(USDTWD) , 2 , diff )*100
-rt.USDTWD<-(exp(apply( log(USDTWD) , 2 , diff ))-1)*100
-
-getSymbols("GBPTWD=X", from = '2012-10-12', to = '2022-10-12')
-GBPTWD<-as.xts(data.frame(`GBPTWD=X` = `GBPTWD=X`[, paste0("GBPTWD=X.Adjusted")]))
-GBPTWD<-na.omit(GBPTWD)
-names(GBPTWD) = c("GBPTWD")
-index(GBPTWD) = as.Date(index(GBPTWD))
-logrt.GBPTWD<-apply( log(GBPTWD) , 2 , diff )*100
-rt.GBPTWD<-(exp(apply( log(GBPTWD) , 2 , diff ))-1)*100
+getSymbols("^GDAXI", from ='2012-10-12', to = '2022-10-12')
+GDAXI <- as.xts(data.frame(GDAXI = GDAXI[, "GDAXI.Adjusted"]))
+GDAXI <- na.omit(GDAXI)
+names(GDAXI) = c("GDAXI")
+index(GDAXI) = as.Date(index(GDAXI))
 
 getSymbols("USDGBP=X", from = '2012-10-12', to = '2022-10-12')
 USDGBP<-as.xts(data.frame(`USDGBP=X` = `USDGBP=X`[, paste0("USDGBP=X.Adjusted")]))
 USDGBP<-na.omit(USDGBP)
 names(USDGBP) = c("USDGBP")
 index(USDGBP) = as.Date(index(USDGBP))
-logrt.USDGBP<-apply( log(USDGBP) , 2 , diff )*100
-rt.USDGBP<-(exp(apply( log(USDGBP) , 2 , diff ))-1)*100
 
 res <- function(data){
   
@@ -119,103 +98,93 @@ a <- rbind(c(1,0,2),c(1,0,4),c(1,0,5))
 a
 a[c(3,1,2),]
 order(c(1,6,2,5,4))
-Price_data <- list(GSPC, FTSE, TWII, USDTWD, GBPTWD, USDGBP)
-
 ```
 
 
 
 
 
-```{r , warning=FALSE}
-plot(Price_data[[1]],main=names(Price_data[[1]]))
-adfTest(Price_data[[1]],type = "ct")
-res(Price_data[[1]])
+```{r GSPC, warning=FALSE}
+plot(GSPC,main=names(GSPC))
+adfTest(GSPC,type = "ct")
+res(GSPC)
 
-plot(diff(Price_data[[1]]),main=names(Price_data[[1]]))
-adfTest(diff(Price_data[[1]]),type = "ct")
-res(diff(Price_data[[1]])[-1])# p=9, q=2
+plot(diff(GSPC),main=names(GSPC))
+adfTest(diff(GSPC),type = "ct")
+res(diff(GSPC)[-1])# p=9, q=2
 
 # determine the order
-auto.arima(diff(Price_data[[1]]),max.p = 9, max.q = 2)
-arima(diff(Price_data[[1]]), order = c(0,0,2))
-detect(diff(Price_data[[1]]), p = 9, q = 2)
+auto.arima(diff(GSPC),max.p = 9, max.q = 2)
+arima(diff(GSPC), order = c(0,0,2))
+detect(diff(GSPC), p = 9, q = 2)
 
-fit.GSPC <- arima(diff(Price_data[[1]]), order = c(6,0,2))
+fit.GSPC <- arima(diff(GSPC), order = c(6,0,2))
 fit.GSPC
-fit.GSPC <- arima(diff(Price_data[[1]]), order = c(6,0,2),
+fit.GSPC <- arima(diff(GSPC), order = c(6,0,2),
                   fixed = c(NA,NA,0,0,NA,NA,NA,NA,NA))
 fit.GSPC
 fit.GSPC$residuals[-1] %>% res()
 tsdiag(fit.GSPC)
+
 ```
 H_o:beta=1 vs H1:beta<1
 
 
+# 這個沒有要用(因為跟GSPC同為美洲)
+```{r VIX,warning=FALSE}
+plot(VIX,main=names(Price_data[[2]]))
+# adfTest(Price_data[[2]],type = "ct")
+# adfTest(Price_data[[2]],type = "c")
+adfTest(VIX,type = "nc")
+res(VIX)#(5,?)
 
+adfTest(diff(VIX),type = "nc")
+res(diff(VIX)[-1])#(9,4)
+
+auto.arima(diff(VIX))#(2,0,2)
+detect(diff(VIX), p = 9, q = 4)
+fit.VIX <- arima(diff(VIX), order = c(9,0,4))
+fit.VIX
+fit.VIX <- arima(diff(VIX), order = c(9,0,4),transform.pars = F,
+                  fixed = c(NA,0,NA,NA,0,NA,0,0,NA,NA,NA,NA,NA,NA))
+
+fit.VIX
+fit.VIX$residuals[-1] %>% res()
+tsdiag(fit.VIX)
+```
+
+# 德國
 ```{r}
-plot(Price_data[[2]],main=names(Price_data[[2]]))
-adfTest(Price_data[[2]],type = "ct")
-res(Price_data[[2]])# Look seasonal (maybe diff by period?)
+plot(GDAXI,main=names(GDAXI))
+adfTest(GDAXI,type = "ct")
+res(GDAXI)
 
-auto.arima(Price_data[[2]], max.q = 8)
+plot(diff(GDAXI),main=names(GDAXI))
+adfTest(diff(GDAXI),type = "ct")
+res(diff(GDAXI)[-1])
 ```
 
 
-autocorelation drop slowly
+```{r, warning=FALSE}
+plot(N225,main=names(N225))
+adfTest(N225,type = "c")
+res(N225)
 
+plot(diff(N225),main=names(N225))
+adfTest(diff(N225),type = "c")
+res(diff(N225)[-1])# p = 3
 
-```{r}
-plot(Price_data[[3]],main=names(Price_data[[3]]))
-adfTest(Price_data[[3]],type = "ct")
-res(Price_data[[3]])
+auto.arima(diff(N225))
+detect(diff(N225), 3, 3)
+fit.N225 <- arima(diff(N225), order = c(3,0,0))
+fit.N225
+fit.N225 <- arima(diff(N225), order = c(3,0,0),transform.pars = F,
+                  fixed = c(0,NA,0,NA))
 
-plot(diff(Price_data[[3]]),main=names(Price_data[[3]]))
-adfTest(diff(Price_data[[3]]),type = "ct")
-res(diff(Price_data[[3]])[-1])# Need diff
-
-auto.arima(Price_data[[3]], max.p = 2, max.q = 1)
-auto.arima(Price_data[[3]],max.P = 11,max.Q = 1)
-
+fit.N225
+fit.N225$residuals[-1] %>% res()
+tsdiag(fit.N225)
 ```
 
 
-```{r}
-plot(Price_data[[4]],main=names(Price_data[[4]]))
-adfTest(Price_data[[4]],type = "ct")
-adfTest(Price_data[[4]],type = "nc")
-res(Price_data[[4]])
-
-plot(diff(Price_data[[4]]),main=names(Price_data[[4]]))
-res(diff(Price_data[[4]])[-1])# overdiff
-```
-
-
-
-
-```{r}
-plot(Price_data[[5]],main=names(Price_data[[5]]))
-adfTest(Price_data[[5]],type = "ct")
-adfTest(Price_data[[5]],type = "c")
-res(Price_data[[5]])
-
-plot(diff(Price_data[[5]]),main=names(Price_data[[5]]))
-adfTest(diff(Price_data[[5]]),type = "ct")
-adfTest(diff(Price_data[[5]]),type = "c")
-res(diff(Price_data[[5]])[-1])# overdiff
-```
-
-
-
-```{r}
-plot(Price_data[[6]],main=names(Price_data[[6]]))
-adfTest(Price_data[[6]],type = "ct")
-adfTest(Price_data[[6]],type = "c")
-res(Price_data[[6]])
-
-plot(diff(Price_data[[5]]),main=names(Price_data[[5]]))
-adfTest(diff(Price_data[[5]]),type = "ct")
-adfTest(diff(Price_data[[5]]),type = "c")
-res(diff(Price_data[[6]])[-1])
-```
 
