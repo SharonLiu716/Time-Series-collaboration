@@ -16,30 +16,114 @@ library(fpp2)
 #===============================================================
 #Get stocks price
 #===============================================================
-
-#VIX
-getSymbols("^VIX", from = '2012-11-28', to = '2022-11-28')
-VIX<-as.xts(data.frame(VIX = VIX[, "VIX.Adjusted"]))
-VIX<-na.omit(VIX)
-names(VIX) = c("VIX")
-index(VIX) = as.Date(index(VIX))
-#HSI
-getSymbols("^N225", from = '2012-11-28', to = '2022-11-28')
+getSymbols("^N225", from = '2012-10-12', to = '2022-10-12')
 N225<-as.xts(data.frame(N225 = N225[, "N225.Adjusted"]))
 N225<-na.omit(N225)
 names(N225) = c("N225")
 index(N225) = as.Date(index(N225))
+
+res <- function(data){
+  
+  acf(data, lag.max = 30)
+  #  title(paste("ACF","of",name), line = 0)
+  
+  pacf(data, lag.max = 30)
+  #  title(paste("PACF","of",name), line = 0.3)
+  
+}
+
+# Check aic and it's order given max.p & max.q
+detect <- function(data,p,q){
+  temp <- c()
+  ord <- c()
+  for (i in 0:p) {
+    for (j in 0:q) {
+      if (i == 0 & j==0) next
+      temp <- c(temp,arima(data,order = c(i,0,j))$aic)
+      ord <- rbind(ord, c(i,0,j))
+    }
+  }
+  list(likelihood = sort(temp),order = ord[order(temp), ])
+}
+
+plot(N225,main='N225')
+adfTest(N225,type = "nc")
+res(N225)
+
+plot(diff(N225),main='N225')
+adfTest(N225,type = "nc")
+adfTest(diff(N225),type = "c")
+adfTest(diff(Price_data[[1]]),type = "ct")
+res(diff(N225)[-1])# p=3, q=2
+
+# determine the order
+auto.arima(diff(N225),max.p = 4, max.q = 2)
+arima(diff(N225), order = c(4,0,0))
+detect(diff(N225), p = 4, q = 2)
+
+fit.N225 <- arima(diff(N225), order = c(3,0,0))
+fit.N225
+fit.N225 <- arima(diff(N225), order = c(3,0,0),fixed = c(0,NA,0,NA),transform.pars='FALSE')
+fit.N225
+fit.N225$residuals[-1] %>% res()
+tsdiag(fit.N225)
+
+#===============================================================
+#Get stocks price
+#===============================================================
+getSymbols("^GDAXI", from = '2012-10-12', to = '2022-10-12')
+GDAXI<-as.xts(data.frame(GDAXI = GDAXI[, "GDAXI.Adjusted"]))
+GDAXI<-na.omit(GDAXI)
+names(GDAXI) = c("GDAXI")
+index(GDAXI) = as.Date(index(GDAXI))
+
+res <- function(data){
+  
+  acf(data, lag.max = 30)
+  #  title(paste("ACF","of",name), line = 0)
+  
+  pacf(data, lag.max = 30)
+  #  title(paste("PACF","of",name), line = 0.3)
+  
+}
+
+# Check aic and it's order given max.p & max.q
+detect <- function(data,p,q){
+  temp <- c()
+  ord <- c()
+  for (i in 0:p) {
+    for (j in 0:q) {
+      if (i == 0 & j==0) next
+      temp <- c(temp,arima(data,order = c(i,0,j))$aic)
+      ord <- rbind(ord, c(i,0,j))
+    }
+  }
+  list(likelihood = sort(temp),order = ord[order(temp), ])
+}
+
+plot(GDAXI,main='GDAXI')
+adfTest(GDAXI,type = "nc")
+res(GDAXI)
+
+plot(diff(GDAXI),main='GDAXI')
+adfTest(diff(GDAXI),type = "nc")
+Box.test(GDAXI, lag=10, type='Ljung')
+res(diff(GDAXI)[-1])# p=3, q=2
+
+# determine the order
+auto.arima(diff(N225),max.p = 4, max.q = 2)
+arima(diff(VIX), order = c(4,0,0))
+detect(diff(VIX), p = 4, q = 2)
+
+fit.N225 <- arima(diff(N225), order = c(3,0,0))
+fit.N225
+fit.N225 <- arima(diff(N225), order = c(3,0,0),fixed = c(0,NA,0,NA))
+fit.GSPC
+fit.GSPC$residuals[-1] %>% res()
+tsdiag(fit.GSPC)
 #==========================================
 #Get original data
 #==========================================
-ori.VIX<-VIX 
-oritp.VIX=tidy(as.xts(ori.VIX)) %>%
-  ggplot(aes(x=index,y=value)) + geom_line(color="#2E9FDF") +geom_hline(yintercept = 0,color='black')+
-  labs(title = paste(colnames(ori.VIX),"Stock Price for 10 years"),subtitle = "Stock Price",caption = " Time Plot") +
-  xlab("Date") + ylab("Stock Price in Percentage") 
-oritp.VIX
-ggsave(paste(colnames(ori.VIX),"Stock Price time plot.png"), plot = oritp.VIX)
-
 ori.N225<-N225 
 oritp.N225 =tidy(as.xts(ori.N225)) %>%
   ggplot(aes(x=index,y=value)) + geom_line(color="#E7B800") +geom_hline(yintercept = 0,color='black')+

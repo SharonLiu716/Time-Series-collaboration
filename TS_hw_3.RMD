@@ -40,7 +40,17 @@ library(fUnitRoots)
 library(stats)
 ```
 
+# 流程
 
+1. collect data from 2012-10-12 to 2022-10-12
+2. plot ACF & PACF Plot for original data 
+3. ADF test for original data
+  -choose type according to time plot
+  -if p-value > 0.05 need to do difference plot ACF & PACf again
+  -plot ACF & PACf & ADF Test again
+4. use ACF PACF to choose order p and q then fit arima model to find appropriate model with minimum AIC
+5. Partial：check whether the coefficient in model significantly or not(not significant->replace with 0)
+6. Plot ACF & PACF plot for residual and do Ljung Box test
 
 ```{r ,include=FALSE}
 getSymbols("^GSPC", from ='2012-10-12', to = '2022-10-12')
@@ -64,11 +74,25 @@ GDAXI <- na.omit(GDAXI)
 names(GDAXI) = c("GDAXI")
 index(GDAXI) = as.Date(index(GDAXI))
 
-getSymbols("USDGBP=X", from = '2012-10-12', to = '2022-10-12')
-USDGBP<-as.xts(data.frame(`USDGBP=X` = `USDGBP=X`[, paste0("USDGBP=X.Adjusted")]))
-USDGBP<-na.omit(USDGBP)
-names(USDGBP) = c("USDGBP")
-index(USDGBP) = as.Date(index(USDGBP))
+getSymbols("EURUSD=X", from = '2012-10-12', to = '2022-10-12')
+EURUSD<-as.xts(data.frame(`EURUSD=X` = `EURUSD=X`[, paste0("EURUSD=X.Adjusted")]))
+EURUSD<-na.omit(EURUSD)
+names(EURUSD) = c("EURUSD")
+index(EURUSD) = as.Date(index(EURUSD))
+
+getSymbols("EURJPY=X", from = '2012-10-12', to = '2022-10-12')
+EURJPY<-as.xts(data.frame(`EURJPY=X` = `EURJPY=X`[, paste0("EURJPY=X.Adjusted")]))
+EURJPY<-na.omit(EURJPY)
+names(EURJPY) = c("EURJPY")
+index(EURJPY) = as.Date(index(EURJPY))
+
+
+getSymbols("USDJPY=X", from = '2012-10-12', to = '2022-10-12')
+USDJPY<-as.xts(data.frame(`USDJPY=X` = `USDJPY=X`[, paste0("USDJPY=X.Adjusted")]))
+USDJPY<-na.omit(USDJPY)
+names(USDJPY) = c("USDJPY")
+index(USDJPY) = as.Date(index(USDJPY))
+
 
 res <- function(data){
   
@@ -102,7 +126,7 @@ order(c(1,6,2,5,4))
 
 
 
-
+# 美國SP500
 
 ```{r GSPC, warning=FALSE}
 plot(GSPC,main=names(GSPC))
@@ -126,9 +150,19 @@ fit.GSPC
 fit.GSPC$residuals[-1] %>% res()
 tsdiag(fit.GSPC)
 
+m3 = arima(diff(GSPC), order = c(6,0,2), xreg = 1:length(diff(GSPC)), include.mean = T)
+m3
 ```
+ADF Test
 H_o:beta=1 vs H1:beta<1
 
+從原始資料的time plot的pattern，ADF test type用ct，p-value為0.4872，且ACF下降緩慢，須對資料進行差分。
+
+差分後ADF test type用ct，p-value為0.01，不差分，根據ACF、PACF初步判斷order p=9、q=2，在這order以下從0開始建模，選出AIC最小的model決定最後的模型的order p=6, q=2。
+
+用差分後的data fit arima(6,0,2)後可以看到coefficient在ar3、ar4的部分不顯著->partial AR
+
+最後再將Partial後的模型的殘差Plot ACF、PACF & Ljung Box Test後皆為white noise。
 
 # 這個沒有要用(因為跟GSPC同為美洲)
 ```{r VIX,warning=FALSE}
@@ -153,21 +187,34 @@ fit.VIX$residuals[-1] %>% res()
 tsdiag(fit.VIX)
 ```
 
-# 德國
+# 德國GDAXI
+
+## 1.1 Time Plot
 ```{r}
 plot(GDAXI,main=names(GDAXI))
-adfTest(GDAXI,type = "ct")
+adfTest(GDAXI,type = "c")
 res(GDAXI)
 
 plot(diff(GDAXI),main=names(GDAXI))
 adfTest(diff(GDAXI),type = "ct")
 res(diff(GDAXI)[-1])
+Box.test(diff(GDAXI)[-1], lag=10, type='Ljung')
+
+
 ```
 
+ADF Test
+H_o:beta=1 vs H1:beta<1
+
+從原始資料的time plot的pattern，ADF test type用c，p-value為0.2182，且ACF下降緩慢，須對資料進行差分。
+
+差分後ADF test type用ct，p-value為0.01，不差分，從ACF、PACF沒有看到指數遞減的現象，第一期便cut off，且沒有任何一個lag是顯著的，由此來看資料並不存在自我相關性，此外，Ljung Box test其p-value=0.4131 > 0.05，意味著資料之間不存在序列相關性，故德國GDAXI不會做後續建模。
+
+# 日本N225
 
 ```{r, warning=FALSE}
 plot(N225,main=names(N225))
-adfTest(N225,type = "c")
+adfTest(N225,type = "nc")
 res(N225)
 
 plot(diff(N225),main=names(N225))
@@ -184,7 +231,87 @@ fit.N225 <- arima(diff(N225), order = c(3,0,0),transform.pars = F,
 fit.N225
 fit.N225$residuals[-1] %>% res()
 tsdiag(fit.N225)
+
+m3 = arima(diff(N225), order = c(3,0,0), xreg = 1:length(diff(N225)), include.mean = T)
+m3
 ```
 
+從原始資料的time plot的pattern，ADF test type用nc，p-value為0.8922，且ACF下降緩慢，須對資料進行差分。
+
+差分後ADF test type用ct，p-value為0.01，不差分，根據ACF、PACF初步判斷order p=3、q=3，在這order以下從0開始建模，選出AIC最小的model決定最後的模型的order p=3, q=0。
+
+用差分後的data fit arima(3,0,0)後可以看到coefficient在ar1、ar3的部分不顯著->partial AR
+
+最後再將Partial後的模型的殘差Plot ACF、PACF & Ljung Box Test後皆為white noise。
 
 
+# EURUSD
+
+```{r, warning=FALSE}
+plot(EURUSD,main=names(EURUSD))
+adfTest(EURUSD,type = "c")
+res(EURUSD)
+
+plot(diff(EURUSD),main=names(EURUSD))
+adfTest(diff(EURUSD),type = "c")
+res(diff(EURUSD)[-1])
+
+auto.arima(diff(EURUSD))
+detect(diff(EURUSD), 3, 3)
+fit.EURUSD <- arima(diff(EURUSD), order = c(0,0,2))
+fit.EURUSD
+
+fit.EURUSD$residuals[-1] %>% res()
+tsdiag(fit.EURUSD)
+
+m3 = arima(diff(EURUSD), order = c(0,0,2), xreg = 1:length(diff(EURUSD)), include.mean = T)
+m3
+```
+
+# EURJPY
+
+```{r, warning=FALSE}
+plot(EURJPY,main=names(EURJPY))
+adfTest(EURJPY,type = "c")
+res(EURJPY)
+
+plot(diff(EURJPY),main=names(EURJPY))
+adfTest(diff(EURJPY),type = "c")
+res(diff(EURJPY)[-1])
+
+auto.arima(diff(EURJPY))
+detect(diff(EURJPY), 3, 3)
+fit.EURJPY <- arima(diff(EURJPY), order = c(0,0,1))
+fit.EURJPY
+
+fit.EURJPY$residuals[-1] %>% res()
+tsdiag(fit.EURJPY)
+
+m3 = arima(diff(EURJPY), order = c(0,0,1), xreg = 1:length(diff(EURJPY)), include.mean = T)
+m3
+```
+
+# USDJPY
+
+```{r, warning=FALSE}
+plot(USDJPY,main=names(USDJPY))
+adfTest(USDJPY,type = "ct")
+res(USDJPY)
+
+plot(diff(USDJPY),main=names(USDJPY))
+adfTest(diff(USDJPY),type = "c")
+res(diff(USDJPY)[-1])# p = 3
+
+auto.arima(diff(USDJPY))
+detect(diff(USDJPY), 5, 2)
+fit.USDJPY <- arima(diff(USDJPY), order = c(4,0,2))
+fit.USDJPY
+fit.USDJPY <- arima(diff(USDJPY), order = c(3,0,0),transform.pars = F,
+                  fixed = c(0,NA,0,NA))
+
+fit.USDJPY
+fit.USDJPY$residuals[-1] %>% res()
+tsdiag(fit.USDJPY)
+m3 = arima(USDJPY, order = c(3,0,0), xreg = 1:length(USDJPY), include.mean = T)
+m3
+```
