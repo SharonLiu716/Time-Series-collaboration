@@ -1,5 +1,5 @@
 rm(list=ls(all=TRUE)) 
-setwd("C:/Users/User/Documents/Time-Series-collaboration")
+#setwd("C:/Users/User/Documents/Time-Series-collaboration")
 library(zoo)
 library(xts)
 library(TTR)
@@ -47,7 +47,22 @@ logrt.USDNZD<-apply( log(USDNZD) , 2 , diff )*100
 res(logrt.USDNZD,'log return of USDNZD')
 
 Box.test(logrt.USDNZD, lag=10, type='Ljung')
+Box.test(logrt.USDNZD^2, lag=10, type='Ljung')
 
+#adf test , p-value<0.05->don't diff
+adfTest(logrt.USDNZD,type = "c")
+
+#fit Garch
+mod.UN<-garchFit(logrt.USDNZD~ garch(1,0), data = logrt.USDNZD, trace = FALSE)
+summary(mod.UN)
+plot(mod.UN)
+par(mfrow=c(1,2))
+mod.UN<-garchFit(logrt.USDNZD~ garch(1,1), data = logrt.USDNZD, trace = FALSE)
+summary(mod.UN)
+plot(mod.UN)
+mod.UN<-garchFit(logrt.USDNZD~ garch(1,1), data = logrt.USDNZD, trace = FALSE,cond.dist = 'sstd')
+summary(mod.UN)
+plot(mod.UN)
 
 #紐西蘭50
 getSymbols("^NZ50", from ='2012-12-12', to = '2022-12-12')
@@ -61,6 +76,7 @@ logrt.NZ50 <- apply( log(NZ50) , 2 , diff )*100
 res(logrt.NZ50,'log return of NZ50')
 
 Box.test(logrt.NZ50, lag=10, type='Ljung')
+Box.test(logrt.NZ50^2, lag=10, type='Ljung')
 
 
 #adf test , p-value<0.05->don't diff
@@ -77,13 +93,16 @@ Box.test(Residual, lag = 12, type='Ljung')
 res(Residual^2,'Residual^2 of ARIMA(4,0,2)for log NZ50')
 Box.test(Residual^2, lag = 12, type='Ljung')
 #garch(1,0) residual box test result:p-value = 0.01085-->garch(1,1)
-m5 = garchFit(logrt.NZ50~arma(4,2) + garch(1,1), data = logrt.NZ50, trace = FALSE)
-summary(m5)
-stresi = residuals(m5, standardize = T)
-res(stresi,'Residual of ARMA(4,2)+Garch(1,1) for log NZ50')
-Box.test(stresi, lag = 12, type='Ljung')
-res(stresi^2,'Residual^2 of ARMA(4,2)+Garch(1,1) for log NZ50')
-Box.test(stresi^2, lag = 12, type='Ljung')
+mod.NZ50 = garchFit(logrt.NZ50~arma(4,2) + garch(1,0), data = logrt.NZ50, trace = FALSE)
+summary(mod.NZ50)
+plot(mod.NZ50)
+mod.NZ50 = garchFit(logrt.NZ50~arma(4,2) + garch(1,1), data = logrt.NZ50, trace = FALSE,cond.dist = 'sstd')
+summary(mod.NZ50)
+plot(mod.NZ50)
+
+13res.NZ50 = residuals(mod.NZ50, standardize = T)
+Box.test(res.NZ50, lag = 12, type='Ljung')
+Box.test(res.NZ50^2, lag = 12, type='Ljung')
 
 
 
