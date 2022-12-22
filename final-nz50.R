@@ -107,9 +107,25 @@ res.NZ50 = residuals(mod.NZ50, standardize = T)
 Box.test(res.NZ50, lag = 12, type='Ljung')
 Box.test(res.NZ50^2, lag = 12, type='Ljung')
 
-
-
-
+ks.test(res.NZ50,"pt",df)
+ad2_stat <- function(x, y) {
+  
+  # Sample sizes
+  n <- length(x)
+  m <- length(y)
+  
+  # Pooled sample and pooled ecdf
+  z <- c(x, y)
+  z <- z[-which.max(z)] # Exclude the largest point
+  H <- rank(z) / (n + m)
+  
+  # Statistic computation via ecdf()
+  (n * m / (n + m)^2) * sum((ecdf(x)(z) - ecdf(y)(z))^2 / ((1 - H) * H))
+  
+}
+ad0 <- ad2_stat(x = res.NZ50, y =t(length(res.NZ50), df))
+pval0 <- 1 - goftest::pAD(q = ad0)
+c("statistic" = ad0, "p-value"= pval0)
 
 fit.NZ50 <- arima(logrt.NZ50, order = c(4,0,2),
                   fixed = c(NA,NA,0,NA,NA,NA,NA),transform.pars= FALSE)
