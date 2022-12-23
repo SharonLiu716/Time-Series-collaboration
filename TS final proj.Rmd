@@ -1,6 +1,6 @@
 ---
 title: "T.S Final Project"
-author: "110225007房錚、1102250劉彥劭、110225021劉懿萱"
+author: "110225007房錚、110225013劉彥劭、110225021劉懿萱"
 date: "`r Sys.Date()`"
 output: 
   html_document: 
@@ -36,28 +36,17 @@ code.r {
   }
   
 pre {
-  font-size: 14px;
+  font-size: 16px;
   color: darkSlateGray;
 }
 </style>
 
 
-# 資料說明{.tabset .tabset-fade .tabset-pills}
+# 原始資料說明與建模流程{.tabset .tabset-fade .tabset-pills}
 
+此次選擇標準普爾(以下SP500代稱)、日經平均指數(以下以N225代稱)、紐西蘭NZX50指數(以下NZ50代稱)，於2012-10-12至2022-10-12十年期間的股價日資料進行資料分析與建模。美金對紐西蘭匯率(以下以USDNZD代稱)、美金對日幣匯率(以下以USDJPY代稱)與紐西蘭對日本匯率(以下以NZDJPY代稱)，於2012-10-12到2022-10-12這段時間內的日資料，分別繪製其報酬率與對數報酬率的time plot、ACF與PACF，並對資料進行Ljung Box Test，看資料是否有序列相關或Arch效應，若有序列相關或Arch效應將更進一步建立AR模型或Garch模型，並於建模後做殘差檢定、分析及預測。
 
-## covid19 map
-
-今年三月的時候在臉書看到了紐約時報發布"How to Virus Got Out?"讓我十分印象深刻，從三月初疫情爆發後歐美各國的卻整與死亡人數節節攀升，有關新冠肺炎的消息漫天蓋地，為了解各國疫情，此次連結covid19即時資訊，運用leaflet map呈現出各國疫情嚴重程度與covid19每日最新資訊，讓閱讀者一目了然。
-
-## googletrend of keyword
-
-為了避免疫情擴大，各國積極宣導防疫措施，部分公司為避免疫情擴大便安排員工在家工作，其中，義大利的嚴重程度僅次於中國，而成人網站Pornhub便藉此機會，宣布義大利用戶於今年三月間皆可免費使用原本需收費的Premium「高級服務」，而這優惠雖僅限於義大利用戶，然而在pornhub公告的全球用戶流量報告中，消息公告後網站流量的增長卻超出義大利用戶數。
-此次將分為關鍵字與各地區之比較，關鍵字比較以Pornhub、FC2、avgle、18av觀察特定地區對於以上四個成人網站的搜尋次數，地區比較則以Pornhub為主要關鍵字，比較各地區的搜尋次數。
-
-# 分析流程{.tabset .tabset-fade .tabset-pills}
-
-
-```{r, echo=FALSE,warning=FALSE,message=FALSE}
+```{r setup, include=FALSE}
 rm(list=ls(all=TRUE)) 
 library(zoo)
 library(xts)
@@ -97,12 +86,10 @@ res <- function(data,obj,cho){
   plot(as.xts(data),main= paste("Time Plot of",obj))
   
 }
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE)
 ```
 
-
-## NZ50
-
-### Timeplot、ACF、PACF of Series
+# 原始資料說明與time plot、ACF、PACF繪製{.tabset .tabset-fade .tabset-pills}
 
 - Timeplot、ACF、PACF:stationary
 
@@ -112,7 +99,11 @@ res <- function(data,obj,cho){
   
 - ADF Test for NZ50:
 
- 對原始資料做ADF test，若p-value<0.05不差分，反之，需差分。
+  對原始資料做ADF test，若p-value<0.05不差分，反之，需差分。
+
+
+## NZ50
+
 
 ```{r, echo=FALSE,warning=FALSE}
 getSymbols("^NZ50", from ='2012-12-12', to = '2022-12-12')
@@ -125,21 +116,45 @@ Box.test(NZ50, lag=10, type='Ljung')
 adfTest(NZ50,type = "ct")
 ```
 
-### diff(log(NZ50)) 
 
-- ADF Test for diff(log(NZ50))
+## USDNZD
+
+
+```{r, echo=FALSE,warning=FALSE}
+getSymbols("USDNZD=X", from = '2012-10-12', to = '2022-10-12')
+USDNZD<-as.xts(data.frame(`USDNZD=X` = `USDNZD=X`[, paste0("USDNZD=X.Adjusted")]))
+USDNZD<-na.omit(USDNZD)
+names(USDNZD) = c("USDNZD")
+index(USDNZD) = as.Date(index(USDNZD))
+res(USDNZD,'original USDNZD','f')
+
+Box.test(USDNZD, lag=10, type='Ljung')
+adfTest(USDNZD,type = "ct")
+
+```
+
+
+# 模型建立{.tabset .tabset-fade .tabset-pills}
+  
+  將原始資料取對數後再進行差分，重新畫time plot、ACF、PACF，並做Ljung Box Test與ADF Test。
+  從Ljung Box Test的結果與ACF、PACF觀察轉換後的資料是否存在一階與二階序列相關，若存在一階序列相關可從ACF、PACF判斷ARMA(p,q)的order p與q；若存在二階序列相關可以Garch(1,0)開始建模，並於建模後對殘差做Ljung Box Test，若存在一階與二階序列相關則結合ARMA(p,q)與Garch(m,s)進行建模。
+  每次建模後若ARMA(p,q)的係數不顯著則調整ARMA(p,q)的order，若residual^2的Ljung Box存在序列相關則調整Garch(m,s)的order。
+
+- ADF Test for diff(log(original data))
   
   將原始資料做log轉換後進行一次差分，並對log轉換後一次差分的資料做ADF Test，若p-value<0.05不差分。
   
 - Series Time Plot、ACF、PACF、Series^2 ACF
 
   Time Plot
-  ACF、PACF: p=9, q=2
-  Series^2 ACF:exist Garch effect
+  ACF、PACF: order p、q
+  Series^2 ACF: whether Garch effect exists or not 
   
-- Box Test for diff(log(NZ50)) & diff(log(NZ50))^2
+- Box Test for diff(log(original data)) & diff(log(original data))^2
 
   檢定資料是否有序列相關，若p-value<0.05則資料存在序列相關，若次方後的資料p-value<0.05則可能有Garch Effect。
+
+## NZ50
 
 ```{r, echo=FALSE,warning=FALSE}
 logrt.NZ50 <- apply( log(NZ50) , 2 , diff )*100
@@ -148,9 +163,17 @@ adfTest(logrt.NZ50,type = "ct")
 Box.test(logrt.NZ50, lag=10, type='Ljung')
 Box.test(logrt.NZ50^2, lag=10, type='Ljung')
 ```
+
+
 ### Model ARMA(p,q) and residual diagnostic
-```{r, echo=FALSE,warning=FALSE}
+
+```{r, echo=FALSE,warning=FALSE,include = FALSE}
 detect(logrt.NZ50, p = 9, q = 3)
+
+```
+
+```{r, echo=FALSE,warning=FALSE}
+
 fit.NZ50 <- arima(logrt.NZ50, order = c(4,0,2))
 fit.NZ50
 Residual<-fit.NZ50$residuals
@@ -158,7 +181,7 @@ res(Residual,'Residual of ARIMA(4,1,2)for log NZ50','t')
 Box.test(Residual, lag = 12, type='Ljung')
 Box.test(Residual^2, lag = 12, type='Ljung')
 ```
-### Model ARMA(4,2)+Garch(1,0)
+### Model ARMA(4,2)+Garch(1,0) and residual diagnostic
 ```{r,echo=FALSE,warning=FALSE}
 mod.NZ50 = garchFit(logrt.NZ50~arma(4,2) + garch(1,0), data = logrt.NZ50, trace = FALSE)
 summary(mod.NZ50)
@@ -172,7 +195,7 @@ Box.test(res.NZ50^2, lag = 12, type='Ljung')
 
 ```
 
-### Model ARMA(4,2)+Garch(1,1)
+### Model ARMA(4,2)+Garch(1,1) and residual diagnostic
 ```{r, echo=FALSE,warning=FALSE}
 mod.NZ50 = garchFit(logrt.NZ50~arma(4,2) + garch(1,1), data = logrt.NZ50, trace = FALSE)
 summary(mod.NZ50)
@@ -185,6 +208,7 @@ Box.test(res.NZ50, lag = 12, type='Ljung')
 Box.test(res.NZ50^2, lag = 12, type='Ljung')
 
 ```
+
 
 ### Model ARMA(4,2)+Garch(1,1) and  assume residual is from standardize T distribution
 
@@ -204,7 +228,11 @@ Box.test(res.NZ50^2, lag = 12, type='Ljung')
 
 
 ### KS Test for residual
-
+```{r,echo=FALSE,warning=FALSE}
+set.seed(110225013)
+sstd<-rsstd(1000, nu =  7.717256, xi =  0.912625)
+ks.test(res.NZ50,sstd)
+```
 
 
 
@@ -215,48 +243,9 @@ Box.test(res.NZ50^2, lag = 12, type='Ljung')
 ```
 
 
+
+
 ## USDNZD
-
-### Timeplot、ACF、PACF of Series
-
-- Timeplot、ACF、PACF:stationary
-
-- Box Test:
-  
-  p-value<0.05 exist correlation
-  
-- ADF Test for USDNZD:
-
- 對原始資料做ADF test，若p-value<0.05不差分，反之，需差分。
-
-```{r, echo=FALSE,warning=FALSE}
-getSymbols("USDNZD=X", from = '2012-10-12', to = '2022-10-12')
-USDNZD<-as.xts(data.frame(`USDNZD=X` = `USDNZD=X`[, paste0("USDNZD=X.Adjusted")]))
-USDNZD<-na.omit(USDNZD)
-names(USDNZD) = c("USDNZD")
-index(USDNZD) = as.Date(index(USDNZD))
-res(USDNZD,'original USDNZD','f')
-
-Box.test(USDNZD, lag=10, type='Ljung')
-adfTest(USDNZD,type = "ct")
-
-```
-
-### diff(log(USDNZD)) 
-
-- ADF Test for diff(log(USDNZD))
-  
-  將原始資料做log轉換後進行一次差分，並對log轉換後一次差分的資料做ADF Test，若p-value<0.05不差分。
-  
-- Series Time Plot、ACF、PACF、Series^2 ACF
-
-  Time Plot
-  ACF、PACF: p=9, q=2
-  Series^2 ACF:exist Garch effect
-  
-- Box Test for diff(log(USDNZD)) & diff(log(USDNZD))^2
-
-  檢定資料是否有序列相關，若p-value<0.05則資料存在序列相關，若次方後的資料p-value<0.05則可能有Garch Effect。
 
 ```{r, echo=FALSE,warning=FALSE}
 
@@ -268,7 +257,7 @@ Box.test(logrt.USDNZD^2, lag=10, type='Ljung')
 
 ```
 
-### Model Garch(1,0)
+### Model Garch(1,0) and residual diagnostic
 
 ```{r, echo=FALSE,warning=FALSE}
 mod.USDNZD<-garchFit(logrt.USDNZD~ garch(1,0), data = logrt.USDNZD, trace = FALSE)
@@ -281,8 +270,8 @@ res.USDNZD = residuals(mod.USDNZD, standardize = T)
 Box.test(res.USDNZD, lag = 12, type='Ljung')
 Box.test(res.USDNZD^2, lag = 12, type='Ljung')
 ```
-### Model Garch(1,1)
-```{r, eval=FALSE,echo=FALSE,warning=FALSE}
+### Model Garch(1,1) and residual diagnostic
+```{r, echo=FALSE,warning=FALSE}
 mod.USDNZD<-garchFit(logrt.USDNZD~ garch(1,1), data = logrt.USDNZD, trace = FALSE)
 summary(mod.USDNZD)
 plot(mod.USDNZD ,which = 10)
@@ -291,12 +280,12 @@ plot(mod.USDNZD ,which = 13)
 
 
 res.USDNZD = residuals(mod.USDNZD, standardize = T)
-Box.test(res.USDNZD, lag = 12, type='Ljung')
-Box.test(res.USDNZD^2, lag = 12, type='Ljung')
+Box.test(res.USDNZD, lag = 10, type='Ljung')
+Box.test(res.USDNZD^2, lag = 10, type='Ljung')
 
 ```
 
-### Model Garch(1,1) and  assume residual is from standardize T distribution
+### Model Garch(1,1) and residual diagnostic(assume residual is from standardize T distribution) 
 ```{r, echo=FALSE,warning=FALSE}
 mod.USDNZD<-garchFit(logrt.USDNZD~ garch(1,1), data = logrt.USDNZD, trace = FALSE,cond.dist = 'sstd')
 summary(mod.USDNZD)
@@ -305,13 +294,17 @@ plot(mod.USDNZD ,which = 11)
 plot(mod.USDNZD ,which = 13)
 
 res.USDNZD = residuals(mod.USDNZD, standardize = T)
-Box.test(res.USDNZD, lag = 12, type='Ljung')
-Box.test(res.USDNZD^2, lag = 12, type='Ljung')
+Box.test(res.USDNZD, lag = 10, type='Ljung')
+Box.test(res.USDNZD^2, lag = 10, type='Ljung')
 
 ```
 
 ### KS Test for residual
-
+```{r,echo=FALSE,warning=FALSE}
+set.seed(110225013)
+sstd<-rsstd(1000, nu =  10, xi =  1.085443)
+ks.test(res.USDNZD,sstd)
+```
 
 ### Predict
 
