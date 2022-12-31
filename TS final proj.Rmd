@@ -71,7 +71,7 @@ detect <- function(data,p,q){
       ord <- rbind(ord, c(i,0,j))
     }
   }
-  list(likelihood = sort(temp),order = ord[order(temp), ])
+  list(likelihood = sort(temp)[1:3],order = ord[order(temp), ][1:3,1:3])
 }
 res <- function(data,obj,cho){
   
@@ -164,24 +164,26 @@ Box.test(logrt.NZ50, lag=10, type='Ljung')
 Box.test(logrt.NZ50^2, lag=10, type='Ljung')
 ```
 
+資料經過對數轉換與差分過後皆通過ADF Test，但資料的一階動差與二階動差皆有序列相關性故我們選擇ARMA加上Garch建模。
 
-### Model ARMA(p,q) and residual diagnostic
+根據對數轉換後的資料的ACF與PACF選取order p與q，找出此order之下AIC最小的模型，NZ50在ARMA(p,q)的order p 與 q
+
+ARMA(p,q)order的決定先從acf/pacf plot選擇出 p & q 的最高order，再向下選出aic最低的模型，圖中可見p = 9,q = 3,故我們從(p,q)=(9,3)開始找起。
+不同order下fit出的ARMA(p,q)的aic，由小到大進行排序，前三者為ARMA(4,2)、arma(5,2)、arma(4,3)。
+
+故我們將先選用ARMA(4,2)與Garch(1,0)配適對數轉換後的資料。
+
+
+
+
+
+### Model ARMA(4,2)+Garch(1,0) and residual diagnostic
 
 ```{r, echo=FALSE,warning=FALSE,include = FALSE}
 detect(logrt.NZ50, p = 9, q = 3)
 
 ```
 
-```{r, echo=FALSE,warning=FALSE}
-
-fit.NZ50 <- arima(logrt.NZ50, order = c(4,0,2))
-fit.NZ50
-Residual<-fit.NZ50$residuals
-res(Residual,'Residual of ARIMA(4,1,2)for log NZ50','t')
-Box.test(Residual, lag = 12, type='Ljung')
-Box.test(Residual^2, lag = 12, type='Ljung')
-```
-### Model ARMA(4,2)+Garch(1,0) and residual diagnostic
 ```{r,echo=FALSE,warning=FALSE}
 mod.NZ50 = garchFit(logrt.NZ50~arma(4,2) + garch(1,0), data = logrt.NZ50, trace = FALSE)
 summary(mod.NZ50)
@@ -189,11 +191,9 @@ plot(mod.NZ50 ,which = 10)
 plot(mod.NZ50 ,which = 11)
 plot(mod.NZ50 ,which = 13)
 
-res.NZ50 = residuals(mod.NZ50, standardize = T)
-Box.test(res.NZ50, lag = 12, type='Ljung')
-Box.test(res.NZ50^2, lag = 12, type='Ljung')
-
 ```
+
+從模型配適結果來看，係數皆顯著，但殘差的二階動差有序列相關，QQ Plot薄尾，故改用ARMA(4,2)與Garch(1,1)重新配適資料。
 
 ### Model ARMA(4,2)+Garch(1,1) and residual diagnostic
 ```{r, echo=FALSE,warning=FALSE}
@@ -203,33 +203,29 @@ plot(mod.NZ50 ,which = 10)
 plot(mod.NZ50 ,which = 11)
 plot(mod.NZ50 ,which = 13)
 
-res.NZ50 = residuals(mod.NZ50, standardize = T)
-Box.test(res.NZ50, lag = 12, type='Ljung')
-Box.test(res.NZ50^2, lag = 12, type='Ljung')
-
 ```
 
+ARMA(4,2)與Garch(1,1)配適後的殘差一階動差與二階動差皆無序列相關，但從QQ Plot來看，資料呈現薄尾的現象，且常態檢定Shapiro Test拒絕虛無假設，表示殘差非常態分配，故改配適假設殘差來自skew T分配的ARMA(4,2)與Garch(1,1)的模型。
 
-### Model ARMA(4,2)+Garch(1,1) and  assume residual is from standardize T distribution
+
+### Model ARMA(4,2)+Garch(1,1) and  assume residual is from skew T distribution
 
 ```{r, echo=FALSE,warning=FALSE}
 
-mod.NZ50 = garchFit(logrt.NZ50~arma(4,2) + garch(1,1), data = logrt.NZ50, trace = FALSE,cond.dist = 'sstd')
+mod.NZ50 = garchFit(logrt.NZ50~arma(4,2) + garch(1,1), data = logrt.NZ50, trace = FALSE,cond.dist = 'snorm')
 summary(mod.NZ50)
 plot(mod.NZ50 ,which = 10)
 plot(mod.NZ50 ,which = 11)
 plot(mod.NZ50 ,which = 13)
 
-res.NZ50 = residuals(mod.NZ50, standardize = T)
-Box.test(res.NZ50, lag = 12, type='Ljung')
-Box.test(res.NZ50^2, lag = 12, type='Ljung')
-
 ```
 
+配適假設殘差來自 skew T分配的ARMA(4,2)與Garch(1,1)的模型後，不僅殘差一階與二階動差皆無序列相關，且QQ Plot的資料點也更貼合斜線，KS Test的結果也不拒絕，此模型有通過殘差假設，故我們選用來自 skew T分配的ARMA(4,2)與Garch(1,1)的模型配適對數轉換後的資料。
 
 ### KS Test for residual
 ```{r,echo=FALSE,warning=FALSE}
 set.seed(110225013)
+res.NZ50 = residuals(mod.NZ50, standardize = T)
 sstd<-rsstd(1000, nu =  7.717256, xi =  0.912625)
 ks.test(res.NZ50,sstd)
 ```
@@ -239,7 +235,7 @@ ks.test(res.NZ50,sstd)
 ### Predict
 
 ```{r, echo=FALSE,warning=FALSE}
-#predict(mod.NZ50, 5)
+
 ```
 
 
@@ -257,6 +253,8 @@ Box.test(logrt.USDNZD^2, lag=10, type='Ljung')
 
 ```
 
+資料經過對數轉換與差分過後皆通過ADF Test，資料的一階動差也沒有序列相關，但二階動差有序列相關性故我們選擇從Garch(1,0)配適模型。
+
 ### Model Garch(1,0) and residual diagnostic
 
 ```{r, echo=FALSE,warning=FALSE}
@@ -265,12 +263,12 @@ summary(mod.USDNZD)
 plot(mod.USDNZD ,which = 10)
 plot(mod.USDNZD ,which = 11)
 plot(mod.USDNZD ,which = 13)
-
-res.USDNZD = residuals(mod.USDNZD, standardize = T)
-Box.test(res.USDNZD, lag = 12, type='Ljung')
-Box.test(res.USDNZD^2, lag = 12, type='Ljung')
 ```
+
+從Garch(1,0)的模型配適結果可以看到係數皆為顯著的，但殘差的一階動差與二階動差皆具有序列相關性，故我們重新配適Garch(1,1)。
+
 ### Model Garch(1,1) and residual diagnostic
+
 ```{r, echo=FALSE,warning=FALSE}
 mod.USDNZD<-garchFit(logrt.USDNZD~ garch(1,1), data = logrt.USDNZD, trace = FALSE)
 summary(mod.USDNZD)
@@ -278,38 +276,60 @@ plot(mod.USDNZD ,which = 10)
 plot(mod.USDNZD ,which = 11)
 plot(mod.USDNZD ,which = 13)
 
-
-res.USDNZD = residuals(mod.USDNZD, standardize = T)
-Box.test(res.USDNZD, lag = 10, type='Ljung')
-Box.test(res.USDNZD^2, lag = 10, type='Ljung')
-
 ```
 
-### Model Garch(1,1) and residual diagnostic(assume residual is from standardize T distribution) 
+從Garch(1,1)的模型配適結果可以看到係數皆為顯著的，一階動差無序列相關，但殘差的二階動差具有序列相關性，且QQ Plot也呈現厚尾的狀態，故我們重新配適假設殘差來自標準T分配的Garch(2,1)。
+
+### Model Garch(1,1) and residual diagnostic(assume residual is from standardize T distribution)
+
 ```{r, echo=FALSE,warning=FALSE}
-mod.USDNZD<-garchFit(logrt.USDNZD~ garch(1,1), data = logrt.USDNZD, trace = FALSE,cond.dist = 'sstd')
+mod.USDNZD<-garchFit(logrt.USDNZD~ garch(2,1), data = logrt.USDNZD, trace = FALSE,cond.dist = 'std')
 summary(mod.USDNZD)
 plot(mod.USDNZD ,which = 10)
 plot(mod.USDNZD ,which = 11)
 plot(mod.USDNZD ,which = 13)
 
-res.USDNZD = residuals(mod.USDNZD, standardize = T)
-Box.test(res.USDNZD, lag = 10, type='Ljung')
-Box.test(res.USDNZD^2, lag = 10, type='Ljung')
+```
+
+由於Garch(2,1)的係數不如Garch(1,1)的模型顯著，雖然殘差的一階動差無序列相關，但殘差的二階動差具有序列相關性，且QQ Plot也呈現厚尾的狀態，故我們將資料逐年檢查，去除有問題的年份後重新配適Garch(1,1)。
+
+### Refit Model Garch(1,1) and residual diagnostic since 2013-10-12 to 2017-10-12
+
+```{r, echo=FALSE,warning=FALSE}
+
+getSymbols("USDNZD=X", from = '2013-10-12', to = '2017-10-12')
+USDNZD<-as.xts(data.frame(`USDNZD=X` = `USDNZD=X`[, paste0("USDNZD=X.Adjusted")]))
+USDNZD<-na.omit(USDNZD)
+names(USDNZD) = c("USDNZD")
+index(USDNZD) = as.Date(index(USDNZD))
+res(USDNZD,'original USDNZD','f')
+
+Box.test(USDNZD, lag=10, type='Ljung')
+adfTest(USDNZD,type = "ct")
+
+logrt.USDNZD<-apply( log(USDNZD) , 2 , diff )*100
+res(logrt.USDNZD,'log return of USDNZD','t')
+adfTest(logrt.USDNZD,type = "ct")
+Box.test(logrt.USDNZD, lag=10, type='Ljung')
+Box.test(logrt.USDNZD^2, lag=10, type='Ljung')
+
+mod.USDNZD<-garchFit(logrt.USDNZD~ garch(1,1), data = logrt.USDNZD, trace = FALSE)
+summary(mod.USDNZD)
+plot(mod.USDNZD ,which = 10)
+plot(mod.USDNZD ,which = 11)
+plot(mod.USDNZD ,which = 13)
+
 
 ```
 
-### KS Test for residual
-```{r,echo=FALSE,warning=FALSE}
-set.seed(110225013)
-sstd<-rsstd(1000, nu =  10, xi =  1.085443)
-ks.test(res.USDNZD,sstd)
-```
+去除有問題的資料區間後，重新抓取2013-10-12到2017-10-12之間的資料，進行對數轉換與差分後配適Garch(1,1)，其殘差一階與二階動差皆無序列相關且殘差亦符合常態假設，故若僅用此區間段的資料配適Garch(1,1)是可行的。
+
+
 
 ### Predict
 
 ```{r,echo=FALSE,warning=FALSE}
-#predict(mod.USDNZD, 5)
+
 ```
 
 
