@@ -44,7 +44,7 @@ pre {
 
 # 原始資料說明與建模流程{.tabset .tabset-fade .tabset-pills}
 
-此次選擇標準普爾(以下SP500代稱)、日經平均指數(以下以N225代稱)、紐西蘭NZX50指數(以下NZ50代稱)，於2012-10-12至2022-10-12十年期間的股價日資料進行資料分析與建模。美金對紐西蘭匯率(以下以USDNZD代稱)、美金對日幣匯率(以下以USDJPY代稱)與紐西蘭對日本匯率(以下以NZDJPY代稱)，於2012-10-12到2022-10-12這段時間內的日資料，分別繪製其報酬率與對數報酬率的time plot、ACF與PACF，並對資料進行Ljung Box Test，看資料是否有序列相關或Arch效應，若有序列相關或Arch效應將更進一步建立AR模型或Garch模型，並於建模後做殘差檢定、分析及預測。
+此次選擇標準普爾(以下SP500代稱)、日經平均指數(以下以N225代稱)、紐西蘭NZX50指數(以下NZ50代稱)，於2012-10-12至2022-10-12十年期間的股價日資料進行資料分析與建模。美金對紐西蘭匯率(以下以USDNZD代稱)、美金對日幣匯率(以下以USDJPY代稱)與紐西蘭對日本匯率(以下以NZDJPY代稱)，於2012-10-12到2022-10-12這段時間內的日資料，分別繪製其報酬率與對數報酬率的time plot、ACF與PACF，並對資料進行Ljung Box Test，看資料是否有序列相關或Arch效應，若有序列相關或Arch效應將更進一步建立ARMA模型或Garch模型，並於建模後做殘差檢定、分析及預測。
 
 ```{r setup, include=FALSE}
 rm(list=ls(all=TRUE)) 
@@ -71,7 +71,7 @@ detect <- function(data,p,q){
       ord <- rbind(ord, c(i,0,j))
     }
   }
-  list(likelihood = sort(temp)[1:3],order = ord[order(temp), ][1:3,1:3])
+  list(likelihood = sort(temp)[1:3],order = ord[order(temp), ][1:3,1:3]) %>% return()
 }
 res <- function(data,obj,cho){
   
@@ -119,7 +119,6 @@ adfTest(NZ50,type = "ct")
 
 ## USDNZD
 
-
 ```{r, echo=FALSE,warning=FALSE}
 getSymbols("USDNZD=X", from = '2012-10-12', to = '2022-10-12')
 USDNZD<-as.xts(data.frame(`USDNZD=X` = `USDNZD=X`[, paste0("USDNZD=X.Adjusted")]))
@@ -133,6 +132,33 @@ adfTest(USDNZD,type = "ct")
 
 ```
 
+## S&P500
+
+```{r, echo=FALSE,warning=FALSE}
+getSymbols("^GSPC", from ='2012-10-12', to = '2022-10-12')
+GSPC <- as.xts(data.frame(GSPC = GSPC[, "GSPC.Adjusted"]))
+names(GSPC) = c("GSPC")
+index(GSPC) = as.Date(index(GSPC))
+res(GSPC,'original GSPC','f')
+
+Box.test(GSPC, lag=10, type='Ljung')
+adfTest(GSPC,type = "ct")
+```
+
+## USDJPY
+
+```{r, echo=FALSE,warning=FALSE}
+getSymbols("USDJPY=X", from ='2012-10-12', to = '2022-10-12')
+USDJPY<-as.xts(data.frame(`USDJPY=X` = `USDJPY=X`[, paste0("USDJPY=X.Adjusted")]))
+USDJPY<-na.omit(USDJPY)
+names(USDJPY) = c("USDJPY")
+index(USDJPY) = as.Date(index(USDJPY))
+res(USDJPY,'original USDJPY','f')
+
+Box.test(USDJPY, lag=10, type='Ljung')
+adfTest(USDJPY,type = "ct")
+
+```
 
 # 模型建立{.tabset .tabset-fade .tabset-pills}
   
@@ -179,7 +205,7 @@ ARMA(p,q)order的決定先從acf/pacf plot選擇出 p & q 的最高order，再�
 
 ### Model ARMA(4,2)+Garch(1,0) and residual diagnostic
 
-```{r, echo=FALSE,warning=FALSE,include = FALSE}
+```{r, echo=FALSE,warning=FALSE}
 detect(logrt.NZ50, p = 9, q = 3)
 
 ```
@@ -193,7 +219,7 @@ plot(mod.NZ50 ,which = 13)
 
 ```
 
-從模型配適結果來看，係數皆顯著，但殘差的二階動差有序列相關，QQ Plot薄尾，故改用ARMA(4,2)與Garch(1,1)重新配適資料。
+從模型配適結果來看，係數皆顯著，但殘差的二階動差有序列相關，QQ Plot厚尾，故改用ARMA(4,2)與Garch(1,1)重新配適資料。
 
 ### Model ARMA(4,2)+Garch(1,1) and residual diagnostic
 ```{r, echo=FALSE,warning=FALSE}
@@ -205,41 +231,35 @@ plot(mod.NZ50 ,which = 13)
 
 ```
 
-ARMA(4,2)與Garch(1,1)配適後的殘差一階動差與二階動差皆無序列相關，但從QQ Plot來看，資料呈現薄尾的現象，且常態檢定Shapiro Test拒絕虛無假設，表示殘差非常態分配，故改配適假設殘差來自skew T分配的ARMA(4,2)與Garch(1,1)的模型。
+ARMA(4,2)與Garch(1,1)配適後的殘差一階動差與二階動差皆無序列相關，但從QQ Plot來看，資料呈現厚尾的現象，且常態檢定Shapiro Test拒絕虛無假設，表示殘差非常態分配，故改配適假設殘差來自skew T分配的ARMA(4,2)與Garch(1,1)的模型。
 
 
 ### Model ARMA(4,2)+Garch(1,1) and  assume residual is from skew T distribution
 
 ```{r, echo=FALSE,warning=FALSE}
 
-mod.NZ50 = garchFit(logrt.NZ50~arma(4,2) + garch(1,1), data = logrt.NZ50, trace = FALSE,cond.dist = 'snorm')
+mod.NZ50 = garchFit(logrt.NZ50~arma(4,2) + garch(1,1), data = logrt.NZ50, trace = FALSE,cond.dist = 'std')
 summary(mod.NZ50)
+plot(mod.NZ50 ,which = 9)
 plot(mod.NZ50 ,which = 10)
 plot(mod.NZ50 ,which = 11)
 plot(mod.NZ50 ,which = 13)
-
+residuals(mod.NZ50, standardize = T) %>% density() %>% plot(.,main="Standardized Residuals of NZ50", xlab="x", ylim = c(0,0.6))# right skew
+curve(dstd(x,nu = 7.549839), from = -4, to = 6, ylab = "", add=T, col = "red")
+legend("topright", legend=c("residual", "std"),
+       col=c("black", "red"), lty=1, cex=1.2)
 ```
 
-配適假設殘差來自 skew T分配的ARMA(4,2)與Garch(1,1)的模型後，不僅殘差一階與二階動差皆無序列相關，且QQ Plot的資料點也更貼合斜線，KS Test的結果也不拒絕，此模型有通過殘差假設，故我們選用來自 skew T分配的ARMA(4,2)與Garch(1,1)的模型配適對數轉換後的資料。
+配適假設殘差來自skew T分配的ARMA(4,2)與Garch(1,1)的模型後，不僅殘差一階與二階動差皆無序列相關，且QQ Plot的資料點也更貼合斜線，KS Test的結果也不拒絕，此模型有通過殘差假設，故我們選用來自 skew T分配的ARMA(4,2)與Garch(1,1)的模型配適對數轉換後的資料。
 
 ### KS Test for residual
 ```{r,echo=FALSE,warning=FALSE}
 set.seed(110225013)
 res.NZ50 = residuals(mod.NZ50, standardize = T)
-sstd<-rsstd(1000, nu =  7.717256, xi =  0.912625)
+sstd<-rstd(1000, nu =   7.549839)
 ks.test(res.NZ50,sstd)
-```
-
-
-
-### Predict
-
-```{r, echo=FALSE,warning=FALSE}
 
 ```
-
-
-
 
 ## USDNZD
 
@@ -315,6 +335,7 @@ Box.test(logrt.USDNZD^2, lag=10, type='Ljung')
 
 mod.USDNZD<-garchFit(logrt.USDNZD~ garch(1,1), data = logrt.USDNZD, trace = FALSE)
 summary(mod.USDNZD)
+plot(mod.USDNZD ,which = 9)
 plot(mod.USDNZD ,which = 10)
 plot(mod.USDNZD ,which = 11)
 plot(mod.USDNZD ,which = 13)
@@ -326,11 +347,110 @@ plot(mod.USDNZD ,which = 13)
 
 
 
-### Predict
+## S&P500
 
 ```{r,echo=FALSE,warning=FALSE}
+logrt.GSPC<-apply( log(GSPC) , 2 , diff )*100
+res(logrt.GSPC,'log return of GSPC','t')
+adfTest(logrt.GSPC,type = "ct")
+Box.test(logrt.GSPC, lag=10, type='Ljung')
+Box.test(logrt.GSPC^2, lag=10, type='Ljung')
+```
+
+資料經過對數轉換與差分過後皆通過ADF Test，但資料的一階動差與二階動差皆有序列相關性故我們選擇ARMA加上Garch建模。
+
+根據對數轉換後的資料的ACF與PACF選取order p與q，找出此order之下AIC最小的模型，NZ50在ARMA(p,q)的order p 與 q
+
+ARMA(p,q)order的決定先從acf/pacf plot選擇出 p & q 的最高order，再向下選出aic最低的模型，圖中可見p = q = 9，為了避免使用過多參數，故我們從(p,q)=(5,5)開始找起。
+不同order下fit出的ARMA(p,q)的aic，由小到大進行排序，前三者為ARMA(5,5)、arma(4,4)、arma(4,5)。
+
+
+
+### Model ARMA(1,1)+Garch(1,1)  and residual diagnostic(assume residual form skewed generalized distribution)
+
+我們先選用ARMA(5,5)與Garch(1,0)配適對數轉換後的資料
+當係數出現NaN或不顯著，我們便修改模型 arma order 至 (1,1) 而後因 garch effect 為消除完全而將 garch order 至 (1,1)，最後透過K-S test診斷標準化殘差是否符合假設分配，發現標準化殘差服從skewed generalized distribution。
+
+
+
+```{r,echo=FALSE,warning=FALSE}
+detect(logrt.GSPC ,5, 5)
+```
+
+
+```{r,echo=FALSE,warning=FALSE}
+fit.GSPC <- garchFit(logrt.GSPC~arma(1,1) + garch(1,1), data = logrt.GSPC, trace = F,cond.dist = "sged")
+fit.GSPC %>% summary()
+plot(fit.GSPC,which=9)
+plot(fit.GSPC,which=10)
+plot(fit.GSPC,which=11)
+plot(fit.GSPC,which=13)
+
+ks.test(residuals(fit.GSPC, standardize = T),rsged(250,nu = 1.332484 , xi = 0.868107))
+residuals(fit.GSPC, standardize = T) %>% density() %>% plot(.,main="Standardized Residuals of SP500", xlab="x", ylim = c(0,0.6))# right skew
+curve(dsged(x,nu = 1.332484 , xi = 0.868107), from = -4, to = 6, ylab = "", add=T, col = "red")
+legend("topright", legend=c("residual", "sged"),
+       col=c("black", "red"), lty=1, cex=1.2)
 
 ```
+
+## USDJPY
+
+```{r,echo=FALSE,warning=FALSE}
+logrt.USDJPY<-apply( log(USDJPY) , 2 , diff )*100
+res(logrt.USDJPY,'log return of USDJPY','t')
+adfTest(logrt.USDJPY,type = "ct")
+Box.test(logrt.USDJPY, lag=10, type='Ljung')
+Box.test(logrt.USDJPY^2, lag=10, type='Ljung')
+```
+
+資料經過對數轉換與差分過後皆通過ADF Test，但資料的一階動差與二階動差皆有序列相關性故我們選擇ARMA加上Garch建模。
+
+根據對數轉換後的資料的ACF與PACF選取order p與q，找出此order之下AIC最小的模型，NZ50在ARMA(p,q)的order p 與 q
+
+ARMA(p,q)order的決定先從acf/pacf plot選擇出 p & q 的最高order，再向下選出aic最低的模型，圖中可見p = q = 5，故我們從(p,q)=(5,5)開始找起。
+不同order下fit出的ARMA(p,q)的aic，由小到大進行排序，前三者為ARMA(2,4)、arma(4,2)、arma(3,5)。
+
+故我們將先選用ARMA(2,4)與Garch(1,0)配適對數轉換後的資料
+
+
+
+### Model ARMA(1,1)+Garch(1,1)  and residual diagnostic(assume residual form skewed T distribution)
+
+我們先選用ARMA(2,4)與Garch(1,0)配適對數轉換後的資料
+當係數出現NaN或不顯著，我們便修改模型 arma order 至 (1,1) 而後因 garch effect 為消除完全而將 garch order 至 (1,1)，最後透過K-S test診斷標準化殘差是否符合假設分配，發現標準化殘差服從skewed T distribution。
+
+
+```{r,warning=FALSE}
+detect(logrt.USDJPY, 5, 5)
+```
+
+```{r,echo=FALSE,warning=FALSE}
+fit.USDJPY <- garchFit(logrt.USDJPY~arma(1,1) + garch(1,1),data = logrt.USDJPY, trace = F,cond.dist = "sstd")
+fit.USDJPY %>% summary()
+plot(fit.USDJPY,which=9)
+plot(fit.USDJPY,which=10)
+plot(fit.USDJPY,which=11)
+plot(fit.USDJPY,which=13)
+USJP.resid <- residuals(fit.USDJPY, standardize = T)
+ks.test(USJP.resid,rsstd(1000,nu = 5.984396 , xi = 0.968644))
+USJP.resid %>% density() %>% plot(.,main="Standardized Residuals of USD/JPY", xlab="x", ylim = c(0,0.6))# right skew
+curve(dsstd(x,nu = 5.984396 , xi = 0.968644), from = -4, to = 6, ylab = "", add=T, col = "red")
+legend("topright", legend=c("residual", "sstd"),
+       col=c("black", "red"), lty=1, cex=1.2)
+```
+
+
+```{r,echo=FALSE,warning=FALSE}
+```
+
+
+```{r,echo=FALSE,warning=FALSE}
+```
+
+```{r,echo=FALSE,warning=FALSE}
+```
+
 
 
 # 結論{.tabset .tabset-fade .tabset-pills}
