@@ -477,6 +477,8 @@ USJP.resid %>% density() %>% plot(.,main="Standardized Residuals of USD/JPY", xl
 curve(dsstd(x,nu = 5.984396 , xi = 0.968644), from = -4, to = 6, ylab = "", add=T, col = "red")
 legend("topright", legend=c("residual", "sstd"),col=c("black", "red"), lty=1, cex=1.2)
 ```
+
+
 ## N225
 
 ```{r, echo=FALSE,warning=FALSE}
